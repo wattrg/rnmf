@@ -7,60 +7,65 @@ use crate::mesh;
 #[allow(dead_code)]
 pub enum BCType
 {
+    /// user supplies a vector which is placed into ghost cells.
+    /// The first entry in the vector is put in the ghost cell closest to
+    /// the valid computational domain
     Prescribed(Vec<f64>),
+
+    /// Linearly extrapolates ghost cells from the data in the valid region,
+    /// so that the value on the boundary is the value supplied by the user
     Dirichlet(f64),
+
+    /// Evenly reflects data near boundary into ghost nodes
     Neumann,
     // UseDefined (some function)
 }
 
 // ****************** Define traits all data frames must have *****************
 
-/// BoundaryCondition trait for DataFrames
+/// All data frames must have a `BoundaryCondition` trait, so that the ghost
+/// nodes can be filled
 pub trait BoundaryCondition
 {
+    /// function which fills the boundary conditions
     fn fill_bc(&mut self, bc_lo: &BCType, bc_hi: &BCType);
 }
-
-/// InitialCondition trait for DataFrames
-pub trait InitialCondition 
-{
-    fn fill_ic (&mut self, ic: &dyn Fn(f64)->f64);
-}
-
 
 
 
 // *********************** Cartesian data frame *******************************
 
-/// Structure to store data defined on a CartesianMesh
+/// Structure to store data defined on a `CartesianMesh`
 #[derive(Debug)]
-pub struct CartesianDataFrame
+pub struct CartesianDataFrame <'a>
 {
+    /// The data is stored here
     pub data: Vec<f64>,
+
+    /// The number of ghost nodes, added to each side of the underlying `CartesianMesh`
     pub n_ghost: u32,
-    pub underlying_mesh: mesh::CartesianMesh,
+
+    /// Reference to the underlying `CartesianMesh`
+    pub underlying_mesh: &'a mesh::CartesianMesh,
 }
 
 /// data structure to store data on CartesianMesh
-impl CartesianDataFrame 
+impl CartesianDataFrame <'_>
 {
-    /// generate new data structure from a given mesh, adding a given number of ghost nodes
-    pub fn new_from(m: mesh::CartesianMesh, n_ghost: u32) -> CartesianDataFrame
+    /// generate new `CartesianDataFrame` from a given mesh, adding a given 
+    /// number of ghost nodes
+    pub fn new_from(m: & mesh::CartesianMesh, n_ghost: u32) -> CartesianDataFrame
     {
-        let u = CartesianDataFrame
+        CartesianDataFrame
         {
             n_ghost,
             data: vec![0.0; m.n + 2*n_ghost as usize],
             underlying_mesh: m,
-        };
-        u
+        }
     }
-}
 
-// I don't know why this isn't accessible elsewhere if implementing CartesianDataFrame
-/// Implement InitialCondition trait for CartesianDataFrame
-impl CartesianDataFrame // for InitialCondition
-{
+
+    /// Fill `CartesianDataFrame` from a initial condition function
     pub fn fill_ic (&mut self, ic: &dyn Fn(f64)->f64)
     {
         for (i,x) in self.underlying_mesh.node_pos.iter().enumerate()
@@ -70,23 +75,22 @@ impl CartesianDataFrame // for InitialCondition
     }
 }
 
-// I don't know why this isn't accessible elsewhere if implementing CartesianDataFrame
-/// Implementation of boundary conditions for CartesianDataFrame
-impl CartesianDataFrame // for Boundary Condition
+/// Implementation of `BoundaryCondition` for `CartesianDataFrame`
+impl BoundaryCondition for CartesianDataFrame <'_> // for Boundary Condition
 {
     /// Fill the ghost nodes of the CartesianDataFrame based on BCType
-    pub fn fill_bc (&mut self, bc_lo: &BCType, bc_hi: &BCType)
+    fn fill_bc (&mut self, bc_lo: &BCType, bc_hi: &BCType)
     {
         // low boundary condition
         match bc_lo
         {
             BCType::Prescribed(values) =>
             {
-                let mut i = 0;
-                for val in values.iter().rev()
+                //let mut i = 0;
+                for (i,val) in values.iter().rev().enumerate()
                 {
                     self.data[i] = *val;
-                    i += 1;
+                    //i += 1;
                 }
 
             }
@@ -137,44 +141,54 @@ impl CartesianDataFrame // for Boundary Condition
     }
 }
 
-/// test module for data frames. 
-/// Currently tests implementation of both types of boundary condition
+
+
+
+
+
+
+
+// test module for data frames. 
+// Currently tests implementation of boundary conditions
 #[cfg(test)]
 mod tests
 {
     use crate::mesh;
     use crate::data_frame;
-    use crate::BCType;
+    use crate::{BCType, BoundaryCondition};
 
     fn initial_condition(x: f64) -> f64
     {
         x + 1.0
     }
 
-    fn test_setup () -> data_frame::CartesianDataFrame
+    #[test]
+    fn test_dirichlet_bc ()
     {
         let u1 = mesh::CartesianMesh::new(0.0, 10.0, 5);
-        let mut cdf = data_frame::CartesianDataFrame::new_from(u1, 2); 
-        //note df now owns u1, and u1 is invalid
-
+        let mut cdf = data_frame::CartesianDataFrame::new_from(&u1, 2);
         cdf.fill_ic(&initial_condition);
-
-        cdf
-    }
-
-    #[test]
-    fn test_dirichlet ()
-    {
-        let mut cdf = test_setup();
         cdf.fill_bc(&BCType::Dirichlet(0.0), &BCType::Dirichlet(1.0));
         assert_eq!(cdf.data, vec![-6.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0, -8.0, -26.0]);
     }
 
     #[test]
-    fn test_neumann ()
+    fn test_neumann_bc ()
     {
-        let mut cdf = test_setup();
+        let u1 = mesh::CartesianMesh::new(0.0, 10.0, 5);
+        let mut cdf = data_frame::CartesianDataFrame::new_from(&u1, 2);
+        cdf.fill_ic(&initial_condition);
         cdf.fill_bc(&BCType::Neumann, &BCType::Neumann);
         assert_eq!(cdf.data, vec![4.0, 2.0, 2.0, 4.0, 6.0, 8.0, 10.0, 10.0, 8.0]);
+    }
+
+    #[test]
+    fn test_prescribed_bc()
+    {
+        let u1 = mesh::CartesianMesh::new(0.0, 10.0, 5);
+        let mut cdf = data_frame::CartesianDataFrame::new_from(&u1, 2);
+        cdf.fill_ic(&initial_condition);
+        cdf.fill_bc(&BCType::Prescribed(vec![-1.0, -2.0]), &BCType::Prescribed(vec![15.0, 16.0]));
+        assert_eq!(cdf.data, vec![-2.0, -1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 15.0, 16.0]);
     }
 }
