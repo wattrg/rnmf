@@ -47,6 +47,8 @@ pub struct CartesianDataFrame <'a>
 
     /// Reference to the underlying `CartesianMesh`
     pub underlying_mesh: &'a mesh::CartesianMesh,
+
+    pub n_comp: usize,
 }
 
 /// data structure to store data on CartesianMesh
@@ -54,26 +56,53 @@ impl CartesianDataFrame <'_>
 {
     /// generate new `CartesianDataFrame` from a given mesh, adding a given 
     /// number of ghost nodes
-    pub fn new_from(m: & mesh::CartesianMesh, n_ghost: u32) -> CartesianDataFrame
+    pub fn new_from(m: & mesh::CartesianMesh, n_comp: usize, n_ghost: u32) -> CartesianDataFrame
     {
+        let mut data_size = m.n[0] + 2*n_ghost as usize;
+        if m.dim >= 2
+        {
+            data_size *= m.n[1] + 2*n_ghost as usize;
+        }
+        if m.dim == 3
+        {
+            data_size *= m.n[2] + 2*n_ghost as usize;
+        }
+
         CartesianDataFrame
         {
             n_ghost,
-            data: vec![0.0; m.n + 2*n_ghost as usize],
+            data:  vec![0.0; data_size],
             underlying_mesh: m,
+            n_comp
         }
+
+        
     }
 
 
     /// Fill `CartesianDataFrame` from a initial condition function
-    pub fn fill_ic (&mut self, ic: &dyn Fn(f64)->f64)
+    pub fn fill_ic (&mut self, ic: &dyn Fn(f64, f64, f64)->f64)
     {
         for (i,x) in self.underlying_mesh.node_pos.iter().enumerate()
         {
-            self.data[i+self.n_ghost as usize] = ic(*x);
+            self.data[i+self.n_ghost as usize] = ic(*x, 0.0, 0.0);
         }
     }
+
+
+
+    /// Retrieves the element at (i,j,k,n)
+    fn index_mut(&mut self, i: usize, j: usize, k: usize, n: usize) -> f64
+    {
+        self.data[n + 
+                  self.n_comp*(i+self.n_ghost as usize) +
+                  self.underlying_mesh.n[1]*self.n_comp*(j+self.n_ghost as usize)+
+                  self.n_comp*self.underlying_mesh.n[1]*self.underlying_mesh.n[2]*(k+self.n_ghost as usize)]
+    }
 }
+
+
+
 
 /// Implementation of `BoundaryCondition` for `CartesianDataFrame`
 impl BoundaryCondition for CartesianDataFrame <'_> // for Boundary Condition
@@ -86,11 +115,9 @@ impl BoundaryCondition for CartesianDataFrame <'_> // for Boundary Condition
         {
             BCType::Prescribed(values) =>
             {
-                //let mut i = 0;
                 for (i,val) in values.iter().rev().enumerate()
                 {
                     self.data[i] = *val;
-                    //i += 1;
                 }
 
             }
@@ -119,7 +146,7 @@ impl BoundaryCondition for CartesianDataFrame <'_> // for Boundary Condition
             {
                 for (i, val) in values.iter().enumerate()
                 {
-                    self.data[i+self.n_ghost as usize + self.underlying_mesh.n] = *val;
+                    self.data[i+self.n_ghost as usize + self.underlying_mesh.n[0]] = *val;
                 }
             }
             BCType::Neumann =>
@@ -157,7 +184,7 @@ mod tests
     use crate::data_frame;
     use crate::{BCType, BoundaryCondition};
 
-    fn initial_condition(x: f64) -> f64
+    fn initial_condition(x: f64, y: f64, z: f64) -> f64
     {
         x + 1.0
     }
@@ -165,8 +192,8 @@ mod tests
     #[test]
     fn test_dirichlet_bc ()
     {
-        let u1 = mesh::CartesianMesh::new(0.0, 10.0, 5);
-        let mut cdf = data_frame::CartesianDataFrame::new_from(&u1, 2);
+        let u1 = mesh::CartesianMesh::new(vec![0.0], vec![10.0], vec![5],1);
+        let mut cdf = data_frame::CartesianDataFrame::new_from(&u1,1, 2);
         cdf.fill_ic(&initial_condition);
         cdf.fill_bc(&BCType::Dirichlet(0.0), &BCType::Dirichlet(1.0));
         assert_eq!(cdf.data, vec![-6.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0, -8.0, -26.0]);
@@ -175,8 +202,8 @@ mod tests
     #[test]
     fn test_neumann_bc ()
     {
-        let u1 = mesh::CartesianMesh::new(0.0, 10.0, 5);
-        let mut cdf = data_frame::CartesianDataFrame::new_from(&u1, 2);
+        let u1 = mesh::CartesianMesh::new(vec![0.0], vec![10.0], vec![5],1);
+        let mut cdf = data_frame::CartesianDataFrame::new_from(&u1,1, 2);
         cdf.fill_ic(&initial_condition);
         cdf.fill_bc(&BCType::Neumann, &BCType::Neumann);
         assert_eq!(cdf.data, vec![4.0, 2.0, 2.0, 4.0, 6.0, 8.0, 10.0, 10.0, 8.0]);
@@ -185,8 +212,8 @@ mod tests
     #[test]
     fn test_prescribed_bc()
     {
-        let u1 = mesh::CartesianMesh::new(0.0, 10.0, 5);
-        let mut cdf = data_frame::CartesianDataFrame::new_from(&u1, 2);
+        let u1 = mesh::CartesianMesh::new(vec![0.0], vec![10.0], vec![5], 1);
+        let mut cdf = data_frame::CartesianDataFrame::new_from(&u1,1, 2);
         cdf.fill_ic(&initial_condition);
         cdf.fill_bc(&BCType::Prescribed(vec![-1.0, -2.0]), &BCType::Prescribed(vec![15.0, 16.0]));
         assert_eq!(cdf.data, vec![-2.0, -1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 15.0, 16.0]);
