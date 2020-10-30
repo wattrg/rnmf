@@ -1,8 +1,6 @@
-
 /// Structure containing data to define a CartesianMesh
 #[derive(Debug)]
-pub struct CartesianMesh
-{
+pub struct CartesianMesh {
     /// The position of the nodes in the mesh
     pub node_pos: Vec<f64>,
 
@@ -13,21 +11,15 @@ pub struct CartesianMesh
     pub hi: f64,
 
     /// The number of cells in nodes in each direction
-    pub n : usize,
+    pub n: usize,
 
     /// The distance between each node in each
-    pub dx: f64
+    pub dx: f64,
 }
 
-
-
-impl CartesianMesh
-{
-
-
+impl CartesianMesh {
     /// Generate new CartesianMesh from the lo and high corner, and the number of nodes
-    pub fn new(lo: f64, hi: f64, n:usize) -> CartesianMesh
-    {
+    pub fn new(lo: f64, hi: f64, n: usize) -> CartesianMesh {
         let dx = (hi - lo) / (n as f64);
         let node_pos = (0..n).map(|i| lo + ((i as f64) + 0.5) * dx).collect();
 

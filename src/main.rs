@@ -1,14 +1,11 @@
-
-
-mod mesh;
 mod data_frame;
+mod mesh;
 
 use data_frame::{BCType, BoundaryCondition};
 
 /// function describing the initial condition
 #[allow(unused_variables)]
-fn initial_condition (x: f64) -> f64
-{
+fn initial_condition(x: f64) -> f64 {
     2.0
 }
 
@@ -28,4 +25,4 @@ fn main() {
     println!("Variable 1 = {:?}", variable1);
     println!("Variable 2 = {:?}", variable2);
 }
-// Hello World!! Kind Regards Gabby <3 
+// Hello World!! Kind Regards Gabby <3
