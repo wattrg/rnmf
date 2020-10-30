@@ -28,19 +28,15 @@ impl CartesianMesh
     /// Generate new CartesianMesh from the lo and high corner, and the number of nodes
     pub fn new(lo: f64, hi: f64, n:usize) -> CartesianMesh
     {
-        let mut u = CartesianMesh
-        {
+        let dx = (hi - lo) / (n as f64);
+        let node_pos = (0..n).map(|i| lo + ((i as f64) + 0.5) * dx).collect();
+
+        CartesianMesh {
             lo,
             hi,
             n,
-            dx: (hi-lo)/(n as f64),
-            node_pos: Vec::new(),
-        };
-
-        for i in 0..n
-        {
-            u.node_pos.push(u.lo + 0.5*u.dx + (i as f64)*u.dx)
+            dx,
+            node_pos,
         }
-        u
     }
 }
