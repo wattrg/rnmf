@@ -1,8 +1,6 @@
-
 /// Structure containing data to define a CartesianMesh
 #[derive(Debug)]
-pub struct CartesianMesh
-{
+pub struct CartesianMesh {
     /// The position of the nodes in the mesh
     pub node_pos: Vec<f64>,
 
@@ -22,15 +20,14 @@ pub struct CartesianMesh
     pub dim: u32
 }
 
-
-
-impl CartesianMesh
-{
-
-
+impl CartesianMesh {
     /// Generate new CartesianMesh from the lo and high corner, and the number of nodes
     pub fn new(lo: Vec<f64>, hi: Vec<f64>, n:Vec<usize>, dim: u32) -> CartesianMesh
     {
+        // I had to get rid of this line so it can loop over all the dimension
+        // feel free to add back if there is a way to do it for dim dimensions
+
+        //let node_pos = (0..n).map(|i| lo + ((i as f64) + 0.5) * dx).collect();
         let mut u = CartesianMesh
         {
             lo,
@@ -53,6 +50,9 @@ impl CartesianMesh
     }
 }
 
+// unused for the moment, but will form the basis for indexing the mesh
+// Will need to make a iterators to iterate over the data
+#[allow(dead_code)]
 impl CartesianMesh
 {
     /// Retrieves the element at (i,j,k,n)
