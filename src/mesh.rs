@@ -24,29 +24,27 @@ impl CartesianMesh {
     /// Generate new CartesianMesh from the lo and high corner, and the number of nodes
     pub fn new(lo: Vec<f64>, hi: Vec<f64>, n:Vec<usize>, dim: u32) -> CartesianMesh
     {
-        // I had to get rid of this line so it can loop over all the dimension
-        // feel free to add back if there is a way to do it for dim dimensions
-
-        //let node_pos = (0..n).map(|i| lo + ((i as f64) + 0.5) * dx).collect();
-        let mut u = CartesianMesh
+        // This will have to be updated to calculate the node positions for meshes in 1, 2, and 3D eventually,
+        // but its time to study XD
+        let mut dx = vec![0.0; dim as usize];
+        for i_dim in 0..dim
+        {
+            //for i in 0..n[i_dim as usize]
+            //{
+                    dx[i_dim as usize] = (hi[i_dim as usize] - lo[i_dim as usize])/(n[i_dim as usize] as f64);
+                    //u.node_pos.push(u.lo[i_dim as usize] + 0.5*u.dx[i_dim as usize] + (i as f64)*u.dx[i_dim as usize]);
+            //}
+        }
+        let node_pos: Vec<f64> = (0..n[0]).map(|i| lo[0] + ((i as f64) + 0.5) * dx[0]).collect();
+        CartesianMesh
         {
             lo,
             hi,
             n,
-            dx: vec![0.0; dim as usize],
-            node_pos: Vec::new(),
+            dx,
+            node_pos,
             dim
-        };
-
-        for i_dim in 0..dim
-        {
-            for i in 0..u.n[i_dim as usize]
-            {
-                    u.dx[i_dim as usize] = (u.hi[i_dim as usize] - u.lo[i_dim as usize])/(u.n[i_dim as usize] as f64);
-                    u.node_pos.push(u.lo[i_dim as usize] + 0.5*u.dx[i_dim as usize] + (i as f64)*u.dx[i_dim as usize]);
-            }
         }
-        u
     }
 }
 
