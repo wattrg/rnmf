@@ -1,9 +1,9 @@
-mod data_frame;
 mod mesh;
 mod config;
 mod boundary_conditions;
 
 use boundary_conditions::{BCType, BoundaryCondition};
+use crate::mesh::cartesian::*;
 
 
 fn main() {
@@ -13,9 +13,9 @@ fn main() {
         dim: 1 as usize,
     };
 
-    let u1 = mesh::CartesianMesh::new(vec![0.0, 0.0], vec![10.0, 10.0], vec![10, 10], config.dim);
-    let mut variable1 = data_frame::CartesianDataFrame::new_from(&u1, 1, 2);
-    let mut variable2 = data_frame::CartesianDataFrame::new_from(&u1, 1, 2);
+    let u1 = CartesianMesh::new(vec![0.0, 0.0], vec![10.0, 10.0], vec![10, 10], config.dim);
+    let mut variable1 = CartesianDataFrame::new_from(&u1, 1, 2);
+    let mut variable2 = CartesianDataFrame::new_from(&u1, 1, 2);
 
     variable1.fill_ic(|_,_,_| 2.0);
     variable1.fill_bc(BCType::Dirichlet(1.0), BCType::Dirichlet(1.0));
@@ -30,3 +30,4 @@ fn main() {
 
 }
 // Hello World!! Kind Regards Gabby <3
+
