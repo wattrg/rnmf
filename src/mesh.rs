@@ -37,6 +37,7 @@ impl CartesianMesh {
             dx[i_dim] = (hi[i_dim] - lo[i_dim])/(n[i_dim] as f64);
         }
 
+        // calculate the capacity of the vector required to store all the node positions
         let mut n_nodes = n[0];
         if dim >= 2{
             n_nodes *= n[1];
@@ -45,19 +46,12 @@ impl CartesianMesh {
                 n_nodes *= n[2];
             }
         }
-
         n_nodes *= dim;
-        
-        // let node_pos: Vec<f64> = (0..n[0])
-        //                             .map(|i| lo[0] + ((i as f64) + 0.5) * dx[0])
-        //                             .collect();
 
-
+        // allocate memory to the node positions vector
         let node_pos = Vec::with_capacity(n_nodes);
 
-
-        
-
+        // allocate memory to the mesh
         let mut cm = CartesianMesh
         {
             lo,
@@ -68,6 +62,8 @@ impl CartesianMesh {
             dim,
             n_nodes,
         };
+
+        // calculate the positions of the nodes
         cm.node_pos = (0..n_nodes).map(
             |p: usize| -> f64 {
                 let (i,j,k,n) = cm.get_ijk(p).unwrap();
@@ -76,10 +72,19 @@ impl CartesianMesh {
                         cm.lo[n] + ((i as f64) + 0.5) * cm.dx[n]
                     }
                     2 => {
-                        cm.lo[n] + ((j as f64) + 0.5) * cm.dx[n]
+                        match n {
+                            0 => {cm.lo[n] + ((i as f64) + 0.5) * cm.dx[n]}
+                            1 => {cm.lo[n] + ((j as f64) + 0.5) * cm.dx[n]}
+                            _ => {panic!("n cannot equal {} in {}D", n, dim)}
+                        }
                     }
                     3 => {
-                        cm.lo[n] + ((k as f64) + 0.5) * cm.dx[n]
+                        match n{
+                            0 => {cm.lo[n] + ((i as f64) + 0.5) * cm.dx[n]}
+                            1 => {cm.lo[n] + ((j as f64) + 0.5) * cm.dx[n]}
+                            2 => {cm.lo[n] + ((k as f64) + 0.5) * cm.dx[n]}
+                            _ => {panic!("n cannot equal {} in {}D", n, dim)}
+                        }
                     }
                     _ => {
                         panic!("{}D not supported!");
@@ -88,25 +93,24 @@ impl CartesianMesh {
                 
             }).collect();
         cm
-
     }
 }
 
 /// Macro which you can pass the mesh and an index and it will return the flattened index
-#[macro_export]
-macro_rules! index {
-    ($self:ident, $i:expr ) => {
-        $i
-    };
+// #[macro_export]
+// macro_rules! index {
+//     ($self:ident, $i:expr ) => {
+//         $i
+//     };
     
-    ($self:ident, $i:expr, $j:expr) => {
-        $i + $self.n[0] * $j
-    };
+//     ($self:ident, $i:expr, $j:expr) => {
+//         $i + $self.n[0] * $j
+//     };
     
-    ($self:ident, $i:expr, $j:expr, $k:expr) => {
-        $i * $self.n[0] * $j * $self.n[1] * $self.n[2] * $k
-    };
-}
+//     ($self:ident, $i:expr, $j:expr, $k:expr) => {
+//         $i * $self.n[0] * $j * $self.n[1] * $self.n[2] * $k
+//     };
+// }
 
 // unused for the moment, but will form the basis for indexing the mesh
 impl CartesianMesh
@@ -220,12 +224,6 @@ mod tests{
     use super::*;
 
     #[test]
-    fn test_macro (){
-        let u1 = CartesianMesh::new(vec![0.0, 0.0], vec![10.0, 10.0], vec![5, 2], 2);
-        assert_eq!(index!(u1, 2, 3), 17);
-    }
-
-    #[test]
     fn test_iterator () {
         let m = CartesianMesh::new(vec![0.0], vec![10.0], vec![5], 1);
         let mut m_iter = m.into_iter();
@@ -255,6 +253,40 @@ mod tests{
         assert_eq!(m3.get_ijk(22).unwrap(), (2,1,0,1));
         assert_eq!(m3.get_ijk(60).unwrap(), (0,0,1,0));
         assert_eq!(m3.get_ijk(300), Option::None);
+    }
+
+    #[test]
+    fn node_pos () {
+        let m1 = CartesianMesh::new(vec![0.0], vec![10.0], vec![5], 1);
+        assert_eq!(m1.node_pos, vec![1.0, 3.0, 5.0, 7.0, 9.0]);
+
+        let m2 = CartesianMesh::new(vec![0.0, 0.0], vec![10.0, 10.0], vec![5,5], 2);
+        assert_eq!(m2.node_pos,
+            vec![
+                1.0, 1.0, 3.0, 1.0, 5.0, 1.0, 7.0, 1.0, 9.0, 1.0,
+                1.0, 3.0, 3.0, 3.0, 5.0, 3.0, 7.0, 3.0, 9.0, 3.0,
+                1.0, 5.0, 3.0, 5.0, 5.0, 5.0, 7.0, 5.0, 9.0, 5.0,
+                1.0, 7.0, 3.0, 7.0, 5.0, 7.0, 7.0, 7.0, 9.0, 7.0,
+                1.0, 9.0, 3.0, 9.0, 5.0, 9.0, 7.0, 9.0, 9.0, 9.0
+            ]
+        );
+
+        let m3 = CartesianMesh::new(vec![0.0,0.0,0.0], vec![6.0,6.0,6.0], vec![3,3,3], 3);
+        assert_eq!(m3.node_pos,
+            vec![
+                1.0, 1.0, 1.0, 3.0, 1.0, 1.0, 5.0, 1.0, 1.0,
+                1.0, 3.0, 1.0, 3.0, 3.0, 1.0, 5.0, 3.0, 1.0,
+                1.0, 5.0, 1.0, 3.0, 5.0, 1.0, 5.0, 5.0, 1.0,
+                //
+                1.0, 1.0, 3.0, 3.0, 1.0, 3.0, 5.0, 1.0, 3.0,
+                1.0, 3.0, 3.0, 3.0, 3.0, 3.0, 5.0, 3.0, 3.0,
+                1.0, 5.0, 3.0, 3.0, 5.0, 3.0, 5.0, 5.0, 3.0,
+                //
+                1.0, 1.0, 5.0, 3.0, 1.0, 5.0, 5.0, 1.0, 5.0,
+                1.0, 3.0, 5.0, 3.0, 3.0, 5.0, 5.0, 3.0, 5.0,
+                1.0, 5.0, 5.0, 3.0, 5.0, 5.0, 5.0, 5.0, 5.0
+            ]
+        );
     }
 }
 
