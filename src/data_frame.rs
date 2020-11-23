@@ -1,75 +1,65 @@
 /// Module which defines and implements data types to store the data on a mesh
 /// Currently, only CartesianMesh's are supported
 use crate::mesh;
+use crate::boundary_conditions::{BCType, BoundaryCondition};
 
-/// Available boundary conditions
-#[allow(dead_code)]
-pub enum BCType {
-    /// user supplies a vector which is placed into ghost cells.
-    /// The first entry in the vector is put in the ghost cell closest to
-    /// the valid computational domain
-    Prescribed(Vec<f64>),
 
-    /// Linearly extrapolates ghost cells from the data in the valid region,
-    /// so that the value on the boundary is the value supplied by the user
-    Dirichlet(f64),
 
-    /// Evenly reflects data near boundary into ghost nodes
-    Neumann,
-    // UseDefined (some function)
-}
 
-// ****************** Define traits all data frames must have *****************
-
-/// All data frames must have a `BoundaryCondition` trait, so that the ghost
-/// nodes can be filled
-pub trait BoundaryCondition {
-    /// function which fills the boundary conditions
-    fn fill_bc(&mut self, bc_lo: BCType, bc_hi: BCType);
-}
 
 // *********************** Cartesian data frame *******************************
-
 /// Structure to store data defined on a `CartesianMesh`
 #[derive(Debug)]
-pub struct CartesianDataFrame<'a> {
+pub struct CartesianDataFrame<'a>{
     /// The data is stored here
     pub data: Vec<f64>,
 
     /// The number of ghost nodes, added to each side of the underlying `CartesianMesh`
-    pub n_ghost: u32,
+    pub n_ghost: usize,
+
+    n_grown: Vec<usize>,
 
     /// Reference to the underlying `CartesianMesh`
     pub underlying_mesh: &'a mesh::CartesianMesh,
 
     pub n_comp: usize,
+
+    n_nodes: usize,
 }
 
 /// data structure to store data on CartesianMesh
 impl CartesianDataFrame<'_> {
     /// generate new `CartesianDataFrame` from a given mesh, adding a given
     /// number of ghost nodes
-    pub fn new_from(m: & mesh::CartesianMesh, n_comp: usize, n_ghost: u32) -> CartesianDataFrame
+    pub fn new_from(m: & mesh::CartesianMesh, 
+                    n_comp: usize, 
+                    n_ghost: usize) -> CartesianDataFrame
     {
-        let mut data_size = m.n[0] + 2*n_ghost as usize;
+        // this could be generated starting from the number of nodes in the 
+        // underlying mesh, but I think this is just as fast in that it requires
+        // the same number of operations
+        let mut n_nodes = m.n[0] + 2*n_ghost;
         if m.dim >= 2
         {
-            data_size *= m.n[1] + 2*n_ghost as usize;
+            n_nodes *= m.n[1] + 2*n_ghost;
+
+            if m.dim == 3
+            {
+                n_nodes *= m.n[2] + 2*n_ghost;
+            }
         }
-        if m.dim == 3
-        {
-            data_size *= m.n[2] + 2*n_ghost as usize;
-        }
+
+
 
         CartesianDataFrame
         {
             n_ghost,
-            data:  vec![0.0; data_size],
+            data:  vec![0.0; n_nodes],
             underlying_mesh: m,
-            n_comp
+            n_comp,
+            n_nodes,
+            n_grown: m.n.clone().into_iter().map(|n| n + 2*n_ghost).collect(),
         }
-
-        
     }
 
     /// Fill `CartesianDataFrame` from a initial condition function
@@ -77,13 +67,12 @@ impl CartesianDataFrame<'_> {
     {
         for (i,x) in self.underlying_mesh.node_pos.iter().enumerate()
         {
-            self.data[i+self.n_ghost as usize] = ic(*x, 0.0, 0.0);
+            self.data[i+self.n_ghost] = ic(*x, 0.0, 0.0);
         }
     }
 
 
     // unused for the moment, but will form the basis for indexing the data frames
-    // Will need to make a iterators to iterate over the data
     /// Retrieves the element at (i,j,k,n). The valid cells are index from zero
     /// and ghost cells at the lower side of the domain are indexed with negative
     /// numbers.
@@ -91,18 +80,19 @@ impl CartesianDataFrame<'_> {
     fn index_mut(&mut self, i: usize, j: usize, k: usize, n: usize) -> f64
     {
         self.data[n + 
-                  self.n_comp*(i+self.n_ghost as usize) +
-                  self.underlying_mesh.n[1]*self.n_comp*(j+self.n_ghost as usize)+
-                  self.n_comp*self.underlying_mesh.n[1]*self.underlying_mesh.n[2]*(k+self.n_ghost as usize)]
+                  self.n_comp*(i+self.n_ghost) +
+                  self.underlying_mesh.n[1]*self.n_comp*(j+self.n_ghost)+
+                  self.n_comp*self.underlying_mesh.n[1]*self.underlying_mesh.n[2]*(k+self.n_ghost)]
     }
+
+
 }
 
 
 
 
 /// Implementation of `BoundaryCondition` for `CartesianDataFrame`
-impl BoundaryCondition for CartesianDataFrame<'_> // for Boundary Condition
-{
+impl BoundaryCondition for CartesianDataFrame<'_> {
     /// Fill the ghost nodes of the CartesianDataFrame based on BCType
     fn fill_bc(&mut self, bc_lo: BCType, bc_hi: BCType) {
         // low boundary condition
@@ -114,14 +104,14 @@ impl BoundaryCondition for CartesianDataFrame<'_> // for Boundary Condition
             }
             BCType::Neumann => {
                 for i in 0usize..self.n_ghost as usize {
-                    self.data[self.n_ghost as usize - i - 1] = self.data[self.n_ghost as usize + i];
+                    self.data[self.n_ghost - i - 1] = self.data[self.n_ghost + i];
                 }
             }
             BCType::Dirichlet(value) => {
                 let m: f64 = self.data[self.n_ghost as usize] - value;
                 for i in 0usize..self.n_ghost as usize {
-                    self.data[self.n_ghost as usize - i - 1] =
-                        self.data[self.n_ghost as usize] - 2.0 * (i as f64 + 1.0) * m
+                    self.data[self.n_ghost - i - 1] =
+                        self.data[self.n_ghost] - 2.0 * (i as f64 + 1.0) * m
                 }
             }
         }
