@@ -39,8 +39,7 @@ trait Indexing{
 impl CartesianMesh {
     /// Generate new CartesianMesh from the lo and high corner, 
     /// and the number of nodes
-    pub fn new(lo: Vec<f64>, hi: Vec<f64>, n:Vec<usize>, dim: usize) 
-        -> Rc<CartesianMesh>
+    pub fn new(lo: Vec<f64>, hi: Vec<f64>, n:Vec<usize>, dim: usize) -> Rc<CartesianMesh>
     {
         let mut dx = vec![0.0; dim as usize];
         for i_dim in 0..dim as usize{
@@ -85,7 +84,7 @@ impl CartesianMesh {
                         match n {
                             0 => {cm.lo[n] + ((i as f64) + 0.5) * cm.dx[n]}
                             1 => {cm.lo[n] + ((j as f64) + 0.5) * cm.dx[n]}
-                            _ => {panic!("n cannot equal {} in {}D", n, dim)}
+                            _ => {panic!("n cannot be {} in {}D", n, dim)}
                         }
                     }
                     3 => {
@@ -93,11 +92,11 @@ impl CartesianMesh {
                             0 => {cm.lo[n] + ((i as f64) + 0.5) * cm.dx[n]}
                             1 => {cm.lo[n] + ((j as f64) + 0.5) * cm.dx[n]}
                             2 => {cm.lo[n] + ((k as f64) + 0.5) * cm.dx[n]}
-                            _ => {panic!("n cannot equal {} in {}D", n, dim)}
+                            _ => {panic!("n cannot be {} in {}D", n, dim)}
                         }
                     }
                     _ => {
-                        panic!("{}D not supported!");
+                        panic!("{}D not supported!", dim);
                     }
                 }
                 
@@ -443,6 +442,7 @@ mod tests{
     use super::*;
 
     #[test]
+    // currently only tests the iterator on 1D data
     fn data_frame_iterator() {
         let m1 = CartesianMesh::new(vec![0.0], vec![6.0], vec![3], 1);
         let mut df = CartesianDataFrame::new_from(& m1, 1, 0);
