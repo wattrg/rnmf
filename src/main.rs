@@ -15,7 +15,7 @@ mod boundary_conditions;
 
 use boundary_conditions::{BCType, BoundaryCondition};
 use crate::mesh::cartesian::*;
-
+//use std::rc::Rc;
 
 fn main() {
     println!("Hello, world!");
@@ -32,23 +32,11 @@ fn main() {
     variable1.fill_ic(|_,_,_| 2.0);
     variable1.fill_bc(BCType::Dirichlet(1.0), BCType::Dirichlet(1.0));
 
-    variable2.fill_ic(|_,_,_| 2.0);
+    variable2.fill_ic(|_,_,_| 3.0);
     variable2.fill_bc(BCType::Dirichlet(0.0), BCType::Dirichlet(0.0));
 
     println!("{:?}", variable1);
-    {
-        let variable1_iter = CartesianDataFrameIter{
-            current_indx: 0,
-            df: &mut variable1,
-        };
-
-        for d in variable1_iter {
-            *d += 1.0;
-        }
-    }
-
-    println!("{:?}", variable1)
-
+    println!("{:?}", variable2);
 
 }
 // Hello World!! Kind Regards Gabby <3

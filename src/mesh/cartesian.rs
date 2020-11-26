@@ -1,5 +1,5 @@
 
-
+use std::rc::Rc;
 
 
 /// Structure containing data to define a CartesianMesh
@@ -40,7 +40,7 @@ impl CartesianMesh {
     /// Generate new CartesianMesh from the lo and high corner, 
     /// and the number of nodes
     pub fn new(lo: Vec<f64>, hi: Vec<f64>, n:Vec<usize>, dim: usize) 
-        -> CartesianMesh
+        -> Rc<CartesianMesh>
     {
         let mut dx = vec![0.0; dim as usize];
         for i_dim in 0..dim as usize{
@@ -102,7 +102,7 @@ impl CartesianMesh {
                 }
                 
             }).collect();
-        cm
+        Rc::new(cm)
     }
 }
 
@@ -221,7 +221,7 @@ use crate::boundary_conditions::{BCType, BoundaryCondition};
 // ********************************* Cartesian data frame ****************************************
 /// Structure to store data defined on a `CartesianMesh`
 #[derive(Debug)]
-pub struct CartesianDataFrame<'a>{
+pub struct CartesianDataFrame{
     /// The data is stored here
     pub data: Vec<f64>,
 
@@ -231,7 +231,7 @@ pub struct CartesianDataFrame<'a>{
     n_grown: Vec<usize>,
 
     /// Reference to the underlying `CartesianMesh`
-    pub underlying_mesh: &'a crate::mesh::cartesian::CartesianMesh,
+    pub underlying_mesh: Rc<CartesianMesh>,
 
     pub n_comp: usize,
 
@@ -239,10 +239,10 @@ pub struct CartesianDataFrame<'a>{
 }
 
 /// data structure to store data on CartesianMesh
-impl <'a> CartesianDataFrame<'a> {
+impl CartesianDataFrame {
     /// generate new `CartesianDataFrame` from a given mesh, adding a given
     /// number of ghost nodes
-    pub fn new_from(m: & crate::mesh::cartesian::CartesianMesh, 
+    pub fn new_from(m: & Rc<CartesianMesh>, 
                     n_comp: usize, n_ghost: usize) -> CartesianDataFrame
     {
         // this could be generated starting from the number of nodes in the 
@@ -263,10 +263,10 @@ impl <'a> CartesianDataFrame<'a> {
         {
             n_ghost,
             data:  vec![0.0; n_nodes],
-            underlying_mesh: m,
+            n_grown: m.n.clone().into_iter().map(|n| n + 2*n_ghost).collect(),
+            underlying_mesh: Rc::clone(m),
             n_comp,
             n_nodes,
-            n_grown: m.n.clone().into_iter().map(|n| n + 2*n_ghost).collect(),
         }
     }
 
@@ -281,7 +281,7 @@ impl <'a> CartesianDataFrame<'a> {
 }
 
 
-impl Indexing for CartesianDataFrame<'_>{
+impl Indexing for CartesianDataFrame{
     #[allow(dead_code)] 
     /// Retrieves the element at (i,j,k,n). The valid cells are index from zero
     /// and ghost cells at the lower side of the domain are indexed with negative
@@ -338,7 +338,7 @@ impl Indexing for CartesianDataFrame<'_>{
 
 
 
-impl <'a> BoundaryCondition for CartesianDataFrame<'a> {
+impl <'a> BoundaryCondition for CartesianDataFrame{
     /// Fill the ghost nodes of the CartesianDataFrame based on BCType
     fn fill_bc(&mut self, bc_lo: BCType, bc_hi: BCType) {
         // low boundary condition
@@ -387,9 +387,9 @@ impl <'a> BoundaryCondition for CartesianDataFrame<'a> {
     }
 }
 
-/// Immutable iterator for `CartesianDataFrame`.
+/// mutable iterator for `CartesianDataFrame`.
 pub struct CartesianDataFrameIter<'a> {
-    pub df: &'a mut CartesianDataFrame<'a>,
+    pub df: &'a mut CartesianDataFrame,
     pub current_indx: usize,
 }
 
@@ -401,7 +401,7 @@ impl <'a> Iterator for CartesianDataFrameIter<'a> {
     // accessing each item once, it is actually safe.
     fn next(&mut self) -> Option<Self::Item> {
         // check if the next item exists
-        if self.current_indx > self.df.n_nodes-self.df.n_comp{
+        if self.current_indx <= self.df.n_nodes-self.df.n_comp{
             // create raw pointer to the data
             let ptr = self.df.data.as_mut_ptr();
             // create variable to store the next item
@@ -421,10 +421,9 @@ impl <'a> Iterator for CartesianDataFrameIter<'a> {
             None
         }
     }
-
 }
 
-impl <'a> IntoIterator for &'a mut CartesianDataFrame <'a>{
+impl <'a> IntoIterator for &'a mut CartesianDataFrame{
     type Item = &'a mut f64;
     type IntoIter = CartesianDataFrameIter<'a>;
 
@@ -446,19 +445,21 @@ mod tests{
     #[test]
     fn data_frame_iterator() {
         let m1 = CartesianMesh::new(vec![0.0], vec![6.0], vec![3], 1);
-        let mut df = CartesianDataFrame::new_from(&m1, 1, 0);
+        let mut df = CartesianDataFrame::new_from(& m1, 1, 0);
         df.fill_ic(|x,_,_| x + 1.0);
 
-        {
-            let mut df_iter = df.into_iter();
-            assert_eq!(df_iter.next().unwrap(), &mut 2.0);
-            assert_eq!(df_iter.next().unwrap(), &mut 4.0);
-            assert_eq!(df_iter.next().unwrap(), &mut 6.0);
-            assert_eq!(df_iter.next(), Option::None);
+        let mut df_iter = df.into_iter();
+        assert_eq!(df_iter.next(), Some(&mut 2.0));
+        assert_eq!(df_iter.next(), Some(&mut 4.0));
+        assert_eq!(df_iter.next(), Some(&mut 6.0));
+        assert_eq!(df_iter.next(), Option::None);
+        
+        // test to make sure mutating the data works
+        for data in &mut df{
+            *data += 1.0;
         }
-        
-        //println!("{:?}", df);
-        
+
+        assert_eq!(df.data, vec![3.0, 5.0, 7.0]);
     }
 
     #[test]
