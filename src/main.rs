@@ -15,16 +15,15 @@ mod boundary_conditions;
 
 use boundary_conditions::{BCType, BoundaryCondition};
 use crate::mesh::cartesian::*;
-//use std::rc::Rc;
+use std::env;
 
-fn main() {
-    println!("Hello, world!");
+fn main() -> Result<(), std::io::Error> {
+    let args: Vec<String> = env::args().collect();
+    let conf = config::read_lua(&args[1]).unwrap();
 
-    let config = config::Config{
-        dim: 1 as usize,
-    };
+    println!("config = {:?}", conf);
 
-    let u1 = CartesianMesh::new(vec![0.0, 0.0], vec![10.0, 10.0], vec![10, 10], config.dim);
+    let u1 = CartesianMesh::new(vec![0.0, 0.0], vec![10.0, 10.0], vec![10, 10], conf.dim);
    
     let mut variable1 = CartesianDataFrame::new_from(&u1, 1, 2);
     let mut variable2 = CartesianDataFrame::new_from(&u1, 1, 2);
@@ -37,6 +36,8 @@ fn main() {
 
     println!("{:?}", variable1);
     println!("{:?}", variable2);
+
+    Ok(())
 
 }
 // Hello World!! Kind Regards Gabby <3

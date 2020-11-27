@@ -6,4 +6,4 @@ edition = "2018"
 
 
 [dependencies]
-# rlua = "0.17.0"
+rlua = "0.17.0"
