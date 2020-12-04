@@ -1,4 +1,10 @@
+// Todo:
+//     - boundary conditions for any dimension
+//     - tests for all dimensions (all tests except boundary conditions have tests for at least
+//       1 and 2 dimensions)
 
+
+use crate::boundary_conditions::{BCType, BoundaryCondition};
 use std::rc::Rc;
 
 
@@ -29,10 +35,10 @@ pub struct CartesianMesh {
 
 trait Indexing{
     /// Returns the non-flat index of the item stored at a particular flattened location
-    fn get_ijk(&self, p: usize ) -> Option<(usize, usize, usize, usize)>;
+    fn get_ijk(&self, p: usize ) -> Option<(isize, isize, isize, usize)>;
 
-    /// Returns the value stored at a particular non-flat index
-    fn index(&self, i: usize, j: usize, k: usize, n: usize) -> f64;
+    /// Returns a borrow to the value stored at a particular non-flat index
+    fn index(&self, i: isize, j: isize, k: isize, n: usize) -> &f64;
 }
 
 
@@ -105,26 +111,74 @@ impl CartesianMesh {
     }
 }
 
+/// function to convert a multi-dimensional coordinate into a single dimension coordinate
+fn get_flat_index(i: isize, j: isize, k: isize, n: usize, 
+            dimension: &[usize], dim: usize, ng: usize) -> usize {
 
+    let mut p = i + ng as isize;
+    if dim >= 2 {
+        p += dimension[0] as isize * (j + ng as isize) 
+                + (dimension[0] * dimension[1] * n) as isize;
+    
+        if dim == 3 {
+            p += (dimension[0] * dimension[1]) as isize * (k + ng as isize) 
+                    + (dimension[2] * dim * dimension[0] * n) as isize;
+        }
+    }
+
+    p as usize
+}
+
+fn get_ijk_from_p(p: usize, dimension: &[usize], n_nodes: usize, dim: usize, ng: usize) 
+                                                        -> Option<(isize, isize, isize, usize)>{
+    if p >= n_nodes {
+        Option::None
+    }
+
+    else{
+        let i = (p % dimension[0]) as isize;
+        let mut j = 0;
+        let k: isize;
+        let d: isize;
+
+        if dim >= 2 { // either 2D or 3D
+            j = (p as isize - i)/dimension[0] as isize % dimension[1] as isize;
+        }
+
+        match dim{
+            1 => {
+                d = (p as isize - i)/dimension[0] as isize;
+                Some((i - ng as isize, 0, 0, d as usize))
+            }
+            2 => {
+                d = (p as isize - j * dimension[1] as isize - i)
+                            /dimension[0] as isize % dim as isize;
+                Some((i - ng as isize, j - ng as isize, 0, d as usize))
+            }
+            3 => {
+                k = (p as isize - j * dimension[1] as isize - i)
+                            /((dimension[0] * dimension[1]) as isize) % dimension[2] as isize;
+                d = (p as isize - k * (dimension[1] * dimension[0]) as isize - j * dimension[0] as isize - i)
+                            /((dimension[0] * dimension[1] * dimension[2]) as isize);
+                Some((i - ng as isize, j - ng as isize, k - ng as isize, d as usize))
+            }
+            _ => {
+                panic!("{}D not supported!", dim);
+            }
+        }
+    }
+}
 
 impl Indexing for CartesianMesh
 {
     /// Retrieves the element at (i,j,k,n)
     #[allow(dead_code)]
-    fn index(&self, i: usize, j: usize, k: usize, n: usize) -> f64
+    fn index(&self, i: isize, j: isize, k: isize, n: usize) -> & f64
     {
-        let mut p = n + self.dim * i;
-        if self.dim >= 2 {
-            p += self.dim*self.n[1]*j;
-        
-            if self.dim == 3 {
-                p += self.dim*self.n[2]*self.n[1]*k;
-            }
-        }
-        
-        let np = self.node_pos.get(p);
+        let p = get_flat_index(i, j, k, n, &self.n, self.dim, 0);
+        let np = self.node_pos.get(p as usize);
         match np{
-            Some(np) => {*np},
+            Some(np) => {np},
             None => panic!("Index ({}, {}, {}, {}) out of range of Cartesian mesh with size {:?}", 
                                 i,j,k,n, self.n),
         }
@@ -132,42 +186,8 @@ impl Indexing for CartesianMesh
     }
 
     /// Returns the un-flattened index
-    fn get_ijk(& self, p: usize) -> Option<(usize, usize, usize, usize)>{
-        if p >= self.n_nodes {
-            None
-        }
-        else{
-            // the idea with the closures is that I'll implement lazy evaluation for each 
-            // closure following https://doc.rust-lang.org/book/ch13-01-closures.html, so that we
-            // aren't performing any unnecessary or repeated calculations
-            let d = p % self.dim;
-            
-            let i = || {
-                ((p-d)/self.dim) % self.n[0]
-            };
-            let j = || {
-                ((p - d - i()*self.dim)/(self.dim * self.n[0])) % self.n[1]
-            };
-            let k = || {
-                (p- j()*self.n[0]*self.dim - i()*self.dim - d)/(self.dim * self.n[0] * self.n[1])
-            };
-            
-
-            match self.dim{
-                1 => {
-                    Some((i(), 0, 0, d))
-                }
-                2 => {
-                    Some((i(), j(), 0, d))
-                }
-                3 => {
-                    Some((i(), j(), k(), d))
-                }
-                _ => {
-                    panic!("{}D not supported!", self.dim);
-                }
-            }
-        }
+    fn get_ijk(& self, p: usize) -> Option<(isize, isize, isize, usize)>{
+        get_ijk_from_p(p, &self.n, self.n_nodes, self.dim, 0)
     }
 }
 
@@ -186,17 +206,18 @@ impl <'a> Iterator for CartesianMeshIter<'a>{
     
     fn next(& mut self) -> Option<Self::Item>{
         // If the next position doesn't exist, return None
-        if self.current_indx > self.mesh.node_pos.len() -self.mesh.dim {
+        if self.current_indx >= self.mesh.node_pos.len(){
             None
         }
         // If the next position exists, return a vector of size self.dim containing references
         // to the position
         else {
             let mut next_pos = Vec::with_capacity(self.mesh.dim);
+            let (i,j,k,n) = self.mesh.get_ijk(self.current_indx).unwrap();
             for i_dim in 0..(self.mesh.dim) {
-                next_pos.push(& self.mesh.node_pos[self.current_indx + i_dim])
+                next_pos.push(self.mesh.index(i, j, k, n + i_dim))
             }
-            self.current_indx += self.mesh.dim;
+            self.current_indx += 1;
             Some(next_pos)
         }
     }
@@ -215,7 +236,6 @@ impl <'a> IntoIterator for &'a CartesianMesh {
 }
 
 
-use crate::boundary_conditions::{BCType, BoundaryCondition};
 
 // ********************************* Cartesian data frame ****************************************
 /// Structure to store data defined on a `CartesianMesh`
@@ -244,9 +264,6 @@ impl CartesianDataFrame {
     pub fn new_from(m: & Rc<CartesianMesh>, 
                     n_comp: usize, n_ghost: usize) -> CartesianDataFrame
     {
-        // this could be generated starting from the number of nodes in the 
-        // underlying mesh, but I think this is just as fast in that it requires
-        // the same number of operations
         let mut n_nodes = m.n[0] + 2*n_ghost;
         if m.dim >= 2 {
             n_nodes *= m.n[1] + 2*n_ghost;
@@ -255,7 +272,7 @@ impl CartesianDataFrame {
                 n_nodes *= m.n[2] + 2*n_ghost;
             }
         }
-        n_nodes *= m.dim;
+        n_nodes *= n_comp;
 
 
         CartesianDataFrame
@@ -270,71 +287,47 @@ impl CartesianDataFrame {
     }
 
     /// Fill `CartesianDataFrame` from a initial condition function
-    pub fn fill_ic (&mut self, ic: fn(f64, f64, f64)->f64)
+    pub fn fill_ic (&mut self, _ic: fn(f64, f64, f64, usize)->f64)
     {
-        for (i,x) in self.underlying_mesh.node_pos.iter().enumerate()
-        {
-            self.data[i+self.n_ghost] = ic(*x, 0.0, 0.0);
+        for (pos, val) in self.into_iter().enumerate_pos(){
+            let (x,y,z,n) = pos;
+            *val = _ic(x,y,z,n);
         }
+
+    }
+
+    /// Convert the flat index of a data point into the (3+1)D coordinates
+    fn get_ijk(&self, p: usize) -> Option<(isize, isize, isize, usize)> {
+        get_ijk_from_p(p, &self.n_grown, self.n_nodes, self.underlying_mesh.dim, self.n_ghost)
+    }
+}
+
+impl core::ops::IndexMut<(isize, isize, isize, usize)> for CartesianDataFrame {
+    /// Exclusively borrows element at (i,j,k,n). The valid cells are indexed from zero 
+    /// and ghost cells at the lower side of the domain are indexed with negative numbers
+    fn index_mut(&mut self, indx: (isize, isize,isize,usize)) -> &mut f64 {
+        let (i,j,k,n) = indx;
+        let p = get_flat_index(i,j,k,n,&self.n_grown,self.underlying_mesh.dim,self.n_ghost);
+        &mut self.data[p]
     }
 }
 
 
-impl Indexing for CartesianDataFrame{
+impl core::ops::Index<(isize, isize, isize, usize)> for CartesianDataFrame{
+    type Output = f64;
+
     #[allow(dead_code)] 
-    /// Retrieves the element at (i,j,k,n). The valid cells are index from zero
+    /// Borrows the element at (i,j,k,n). The valid cells are indexed from zero
     /// and ghost cells at the lower side of the domain are indexed with negative
     /// numbers.
-    fn index(&self, i: usize, j: usize, k: usize, n: usize) -> f64
-    {
-        self.data[n + 
-                  self.n_comp*(i+self.n_ghost) +
-                  self.underlying_mesh.n[1]*self.n_comp*(j+self.n_ghost)+
-                  self.n_comp*self.underlying_mesh.n[1]*self.underlying_mesh.n[2]*(k+self.n_ghost)]
+    fn index(&self, indx: (isize, isize, isize, usize) ) -> &f64 {
+        let (i,j,k,n) = indx;
+        let p = get_flat_index(i, j, k, n, &self.n_grown, self.underlying_mesh.dim, self.n_ghost);
+
+        &self.data[p]
     }
 
-    fn get_ijk(&self, p: usize) -> Option<(usize, usize, usize, usize)> {
-        if p >= self.n_nodes {
-            None
-        }
-        else{
-            // the idea with the closures is that I'll implement lazy evaluation for each 
-            // closure following https://doc.rust-lang.org/book/ch13-01-closures.html, so that we
-            // aren't performing any unnecessary or repeated calculations
-            let n0 = self.underlying_mesh.n[0];
-            let n1 = self.underlying_mesh.n[1];
-            let n = p % self.n_comp;
-            
-            let i = || {
-                (p-n/self.n_comp) % n0
-            };
-            let j = || {
-                ((p - n - i()*self.n_comp)/(self.n_comp * n0)) % n1
-            };
-            let k = || {
-                (p- j()*n0*self.n_comp - i()*self.n_comp - n)/(self.n_comp * n0 * n1)
-            };
-            
-
-            match self.underlying_mesh.dim{
-                1 => {
-                    Some((i() - self.n_ghost, 0, 0, n))
-                }
-                2 => {
-                    Some((i() - self.n_ghost, j() - self.n_ghost, 0, n))
-                }
-                3 => {
-                    Some((i() - self.n_ghost, j() - self.n_ghost, k() - self.n_ghost, n))
-                }
-                _ => {
-                    panic!("{}D not supported!", self.underlying_mesh.dim);
-                }
-            }
-        }
-    }
 }
-
-
 
 
 impl <'a> BoundaryCondition for CartesianDataFrame{
@@ -384,38 +377,63 @@ impl <'a> BoundaryCondition for CartesianDataFrame{
             }
         }
     }
+
+    fn ijk_is_valid_cell(&self, i: isize, j: isize, k: isize) -> bool {
+        let above_zero = i >= 0 && j >= 0 && k >= 0;
+
+        let mut below_max = i < self.underlying_mesh.n[0] as isize;
+        if self.underlying_mesh.dim >= 2 {
+            below_max = below_max && j < self.underlying_mesh.n[1]  as isize;
+            if self.underlying_mesh.dim == 3 {
+                below_max = below_max && k < self.underlying_mesh.n[2] as isize;
+            }
+        }
+        above_zero && below_max
+    }
+
+    fn p_is_valid_cell(&self, p: usize) -> bool {
+        let (i,j,k,_) = self.get_ijk(p).unwrap();
+        self.ijk_is_valid_cell(i, j, k)
+    }
 }
+
+
 
 /// mutable iterator for `CartesianDataFrame`.
 pub struct CartesianDataFrameIter<'a> {
-    pub df: &'a mut CartesianDataFrame,
-    pub current_indx: usize,
+    df: &'a mut CartesianDataFrame,
+    current_indx: usize,
 }
+
+
 
 impl <'a> Iterator for CartesianDataFrameIter<'a> {
     type Item = &'a mut f64;
 
-    // this is a safe function containing unsafe code, since rust doesn't allow multiple mutable
-    // references to independent elements of a vector. But in this case, because we are ever only
-    // accessing each item once, it is actually safe.
+    // this is a safe function wrapping unsafe code. Rust cannot guarantee that it is safe, but
+    // in practice it can be, and I'm pretty sure that it should be safe for everything we will 
+    // ever want to do
     fn next(&mut self) -> Option<Self::Item> {
+        //println!("Calling next on base iterator");
+        // progress the current index to skip ghost cells
+        while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
+                                  !self.df.p_is_valid_cell(self.current_indx) {
+            self.current_indx += 1;
+        }
+
         // check if the next item exists
-        if self.current_indx <= self.df.n_nodes-self.df.n_comp{
-            // create raw pointer to the data
+        if self.current_indx <= self.df.n_nodes-self.df.n_comp 
+                   && self.df.p_is_valid_cell(self.current_indx){
+            // access and return next item 
             let ptr = self.df.data.as_mut_ptr();
-            // create variable to store the next item
             let next_data: Option<Self::Item>;
             unsafe{
-                // access next item
                 next_data = ptr.add(self.current_indx).as_mut();
             }
-            // increment current index
-            self.current_indx += self.df.n_comp;
-
-            // return the next item
+            self.current_indx += 1;
             next_data
         }
-        // if the next item doesn't exist, return Option::None
+        // if the next item doesn't exist, return None
         else {
             None
         }
@@ -434,6 +452,80 @@ impl <'a> IntoIterator for &'a mut CartesianDataFrame{
     }
 }
 
+pub struct EnumerateIndex<'a>{
+    iter: CartesianDataFrameIter<'a>,
+}
+
+pub trait IndexEnumerable <'a> {
+    fn enumerate_index(self) -> EnumerateIndex<'a>;
+}
+
+impl <'a> IndexEnumerable <'a> for CartesianDataFrameIter<'a> {
+    fn enumerate_index(self) -> EnumerateIndex<'a> {
+        EnumerateIndex{
+            iter: self,
+        }
+    }
+}
+
+impl <'a> Iterator for EnumerateIndex<'a> {
+    type Item = ((isize, isize, isize, usize), &'a mut f64);
+
+    fn next(&mut self) -> Option<Self::Item>{
+        let next_item = self.iter.next();
+        match next_item{
+            Some(nv) => {
+                Some((self.iter.df.get_ijk(self.iter.current_indx-1).unwrap(), nv))
+            }
+            None => {
+                None
+            }
+        }
+        
+    }
+}
+
+pub struct EnumeratePos<'a>{
+    iter: CartesianDataFrameIter<'a>,
+}
+pub trait PosEnumerable <'a> {
+    fn enumerate_pos(self) -> EnumeratePos<'a>;
+}
+
+impl <'a> PosEnumerable <'a> for CartesianDataFrameIter<'a> {
+    fn enumerate_pos(self) -> EnumeratePos<'a> {
+        EnumeratePos{
+            iter: self,
+        }
+    }
+}
+
+impl <'a> Iterator for EnumeratePos<'a> {
+    type Item = ((f64, f64, f64, usize), &'a mut f64);
+
+    fn next(&mut self) -> Option<Self::Item>{
+        let next_item = self.iter.next();
+        match next_item{
+            Some(nv) => {
+                let (i,j,k,n) = self.iter.df.get_ijk(self.iter.current_indx-1).unwrap();
+                let pos_x = *self.iter.df.underlying_mesh.index(i, j, k, 0);
+                let mut pos_y = 0.0;
+                let mut pos_z = 0.0;
+                if self.iter.df.underlying_mesh.dim >= 2 {
+                    pos_y = *self.iter.df.underlying_mesh.index(i, j, k, 1);
+                    if self.iter.df.underlying_mesh.dim == 3 {
+                        pos_z = *self.iter.df.underlying_mesh.index(i, j, k, 2);
+                    }
+                }
+                Some(((pos_x, pos_y, pos_z, n), nv))
+            }
+            None => {
+                None
+            }
+        }
+        
+    }
+}
 
 
 
@@ -442,24 +534,74 @@ mod tests{
     use super::*;
 
     #[test]
+    fn is_valid_cell () {
+        let m1 = CartesianMesh::new(vec![0.0], vec![6.0], vec![3], 1);
+        let df = CartesianDataFrame::new_from(&m1, 1, 1);
+
+        assert_eq!(df.p_is_valid_cell(0), false);
+        assert_eq!(df.p_is_valid_cell(1), true);
+        assert_eq!(df.p_is_valid_cell(2), true);
+        assert_eq!(df.p_is_valid_cell(3), true);
+        assert_eq!(df.p_is_valid_cell(4), false);
+    }
+
+    #[test]
+    fn enumerate_pos () {
+        let m1 = CartesianMesh::new(vec![0.0], vec![6.0], vec![3], 1);
+        let mut df = CartesianDataFrame::new_from(&m1, 1, 1);
+        
+
+        let mut df_iter_pos = df.into_iter().enumerate_pos();
+
+        assert_eq!(df_iter_pos.next(), Some(((1.0, 0.0, 0.0, 0), &mut 0.0)));
+        assert_eq!(df_iter_pos.next(), Some(((3.0, 0.0, 0.0, 0), &mut 0.0)));
+        
+
+    }
+
+    #[test]
     // currently only tests the iterator on 1D data
     fn data_frame_iterator() {
-        let m1 = CartesianMesh::new(vec![0.0], vec![6.0], vec![3], 1);
-        let mut df = CartesianDataFrame::new_from(& m1, 1, 0);
-        df.fill_ic(|x,_,_| x + 1.0);
+        // 1D
+        {
+            let m1 = CartesianMesh::new(vec![0.0], vec![6.0], vec![3], 1);
+            let mut df = CartesianDataFrame::new_from(&m1, 1, 1);
+            df.fill_ic(|x,_,_,_|  x + 1.0);
 
-        let mut df_iter = df.into_iter();
-        assert_eq!(df_iter.next(), Some(&mut 2.0));
-        assert_eq!(df_iter.next(), Some(&mut 4.0));
-        assert_eq!(df_iter.next(), Some(&mut 6.0));
-        assert_eq!(df_iter.next(), Option::None);
-        
-        // test to make sure mutating the data works
-        for data in &mut df{
-            *data += 1.0;
+            // test that the iterators gives the correct values
+            let mut df_iter = df.into_iter();
+            assert_eq!(df_iter.next(), Some(&mut 2.0));
+            assert_eq!(df_iter.next(), Some(&mut 4.0));
+            assert_eq!(df_iter.next(), Some(&mut 6.0));
+            assert_eq!(df_iter.next(), Option::None);
+            
+            // test to make sure mutating the data works
+            for data in &mut df{
+                *data += 1.0;
+            }
+            assert_eq!(df.data, vec![0.0, 3.0, 5.0, 7.0, 0.0]);
         }
+        
+        // 2D
+        {
+            let m2 = CartesianMesh::new(vec![0.0, 0.0], vec![6.0, 6.0], vec![3, 3], 2);
+            let mut df2 = CartesianDataFrame::new_from(&m2, 1, 1);
+            df2.fill_ic(|x,y,_,_| x + y);
+            
 
-        assert_eq!(df.data, vec![3.0, 5.0, 7.0]);
+
+            let mut df2_iter = df2.into_iter();
+            assert_eq!(df2_iter.next(), Some(&mut 2.0));
+            assert_eq!(df2_iter.next(), Some(&mut 4.0));
+            assert_eq!(df2_iter.next(), Some(&mut 6.0));
+            assert_eq!(df2_iter.next(), Some(&mut 4.0));
+            assert_eq!(df2_iter.next(), Some(&mut 6.0));
+            assert_eq!(df2_iter.next(), Some(&mut 8.0));
+            assert_eq!(df2_iter.next(), Some(&mut 6.0));
+            assert_eq!(df2_iter.next(), Some(&mut 8.0));
+            assert_eq!(df2_iter.next(), Some(&mut 10.0));
+            assert_eq!(df2_iter.next(), None);
+        }
     }
 
     #[test]
@@ -493,22 +635,20 @@ mod tests{
         let m1 = CartesianMesh::new(vec![0.0], vec![10.0], vec![5], 1);
         assert_eq!(m1.get_ijk(3).unwrap(), (3,0,0,0));
         assert_eq!(m1.get_ijk(5), Option::None);
-        assert_eq!(m1.index(3, 0, 0, 0), 7.0);
+        assert_eq!(m1.index(3, 0, 0, 0), &7.0);
         let mut cdf1 = CartesianDataFrame::new_from(&m1, 1, 2);
-        cdf1.fill_ic(|x,_,_|x + 1.0);
+        cdf1.fill_ic(|x,_,_,_|x + 1.0);
 
-        let m2 = CartesianMesh::new(vec![0.0,0.0], vec![10.0,8.0], vec![5,4], 2);
-        assert_eq!(m2.get_ijk(3).unwrap(), (1,0,0,1));
-        assert_eq!(m2.get_ijk(15).unwrap(), (2,1,0,1));
+        let m2 = CartesianMesh::new(vec![0.0,0.0], vec![6.0,6.0], vec![3,3], 2);
+        assert_eq!(m2.get_ijk(16).unwrap(), (1,2,0,1));
         assert_eq!(m2.get_ijk(40), Option::None);
-        assert_eq!(m2.index(2,1,0,1), 3.0);
+        assert_eq!(m2.index(2,1,0,1), &3.0);
 
-        let m3 = CartesianMesh::new(vec![0.0,0.0,0.0], vec![10.0,8.0,10.0], vec![5,4,5], 3);
-        assert_eq!(m3.get_ijk(3).unwrap(), (1,0,0,0));
-        assert_eq!(m3.get_ijk(22).unwrap(), (2,1,0,1));
-        assert_eq!(m3.get_ijk(60).unwrap(), (0,0,1,0));
-        assert_eq!(m3.get_ijk(300), Option::None);
-        assert_eq!(m3.index(2,1,0,1), 3.0);
+        let m3 = CartesianMesh::new(vec![0.0,0.0,0.0], vec![6.0,6.0,6.0], vec![3,3,3], 3);
+        assert_eq!(m3.get_ijk(3).unwrap(), (0,1,0,0));
+        assert_eq!(m3.get_ijk(22).unwrap(), (1,1,2,0));
+        assert_eq!(m3.get_ijk(81), None);
+        assert_eq!(m3.index(2,1,0,1), &3.0);
     }
 
     #[test]
@@ -520,11 +660,18 @@ mod tests{
         assert_eq!(
             m2.node_pos,
             vec![
-                1.0, 1.0, 3.0, 1.0, 5.0, 1.0, 7.0, 1.0, 9.0, 1.0,
-                1.0, 3.0, 3.0, 3.0, 5.0, 3.0, 7.0, 3.0, 9.0, 3.0,
-                1.0, 5.0, 3.0, 5.0, 5.0, 5.0, 7.0, 5.0, 9.0, 5.0,
-                1.0, 7.0, 3.0, 7.0, 5.0, 7.0, 7.0, 7.0, 9.0, 7.0,
-                1.0, 9.0, 3.0, 9.0, 5.0, 9.0, 7.0, 9.0, 9.0, 9.0
+                // x values
+                1.0, 3.0, 5.0, 7.0, 9.0, 
+                1.0, 3.0, 5.0, 7.0, 9.0,
+                1.0, 3.0, 5.0, 7.0, 9.0,
+                1.0, 3.0, 5.0, 7.0, 9.0,
+                1.0, 3.0, 5.0, 7.0, 9.0,
+                // y values
+                1.0, 1.0, 1.0, 1.0, 1.0,
+                3.0, 3.0, 3.0, 3.0, 3.0, 
+                5.0, 5.0, 5.0, 5.0, 5.0,
+                7.0, 7.0, 7.0, 7.0, 7.0, 
+                9.0, 9.0, 9.0, 9.0, 9.0
             ]
         );
 
@@ -532,17 +679,44 @@ mod tests{
         assert_eq!(
             m3.node_pos,
             vec![
-                1.0, 1.0, 1.0, 3.0, 1.0, 1.0, 5.0, 1.0, 1.0,
-                1.0, 3.0, 1.0, 3.0, 3.0, 1.0, 5.0, 3.0, 1.0,
-                1.0, 5.0, 1.0, 3.0, 5.0, 1.0, 5.0, 5.0, 1.0,
-                //
-                1.0, 1.0, 3.0, 3.0, 1.0, 3.0, 5.0, 1.0, 3.0,
-                1.0, 3.0, 3.0, 3.0, 3.0, 3.0, 5.0, 3.0, 3.0,
-                1.0, 5.0, 3.0, 3.0, 5.0, 3.0, 5.0, 5.0, 3.0,
-                //
-                1.0, 1.0, 5.0, 3.0, 1.0, 5.0, 5.0, 1.0, 5.0,
-                1.0, 3.0, 5.0, 3.0, 3.0, 5.0, 5.0, 3.0, 5.0,
-                1.0, 5.0, 5.0, 3.0, 5.0, 5.0, 5.0, 5.0, 5.0
+                // x values
+                1.0, 3.0, 5.0, 
+                1.0, 3.0, 5.0, 
+                1.0, 3.0, 5.0,
+
+                1.0, 3.0, 5.0, 
+                1.0, 3.0, 5.0, 
+                1.0, 3.0, 5.0,
+
+                1.0, 3.0, 5.0, 
+                1.0, 3.0, 5.0, 
+                1.0, 3.0, 5.0,
+                
+                // y values
+                1.0, 1.0, 1.0, 
+                3.0, 3.0, 3.0, 
+                5.0, 5.0, 5.0,
+
+                1.0, 1.0, 1.0, 
+                3.0, 3.0, 3.0, 
+                5.0, 5.0, 5.0,
+
+                1.0, 1.0, 1.0, 
+                3.0, 3.0, 3.0, 
+                5.0, 5.0, 5.0,
+                
+                // z values
+                1.0, 1.0, 1.0, 
+                1.0, 1.0, 1.0, 
+                1.0, 1.0, 1.0,
+
+                3.0, 3.0, 3.0, 
+                3.0, 3.0, 3.0, 
+                3.0, 3.0, 3.0,
+
+                5.0, 5.0, 5.0, 
+                5.0, 5.0, 5.0, 
+                5.0, 5.0, 5.0,
             ]
         );
     }
@@ -551,7 +725,7 @@ mod tests{
     fn test_dirichlet_bc() {
         let u1 = CartesianMesh::new(vec![0.0], vec![10.0], vec![5], 1);
         let mut cdf = CartesianDataFrame::new_from(&u1, 1, 2);
-        cdf.fill_ic(|x,_,_| x + 1.0);
+        cdf.fill_ic(|x,_,_,_| x + 1.0);
         cdf.fill_bc(BCType::Dirichlet(0.0), BCType::Dirichlet(1.0));
         assert_eq!(
             cdf.data,
@@ -563,7 +737,7 @@ mod tests{
     fn test_neumann_bc() {
         let u1 = CartesianMesh::new(vec![0.0], vec![10.0], vec![5], 1);
         let mut cdf = CartesianDataFrame::new_from(&u1, 1, 2);
-        cdf.fill_ic(|x, _,_| x + 1.0);
+        cdf.fill_ic(|x, _,_,_| x + 1.0);
         cdf.fill_bc(BCType::Neumann, BCType::Neumann);
         assert_eq!(
             cdf.data,
@@ -575,7 +749,7 @@ mod tests{
     fn test_prescribed_bc() {
         let u1 = CartesianMesh::new(vec![0.0], vec![10.0], vec![5], 1);
         let mut cdf = CartesianDataFrame::new_from(&u1, 1, 2);
-        cdf.fill_ic(|x, _,_| x + 1.0);
+        cdf.fill_ic(|x, _,_,_| x + 1.0);
         cdf.fill_bc(
             BCType::Prescribed(vec![-1.0, -2.0]),
             BCType::Prescribed(vec![15.0, 16.0]),

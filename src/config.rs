@@ -8,7 +8,7 @@ pub struct Config {
 }
 
 /// function which executes a lua file (located at lua_loc), and returns the configuration
-pub fn read_lua(lua_loc: &String) -> Result<Config, std::io::Error>{
+pub fn read_lua(lua_loc: &str) -> Result<Config, std::io::Error>{
     // load the contents of the file
     let lua_file = fs::read_to_string(lua_loc).expect("Could not read lua file");
 

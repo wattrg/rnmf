@@ -5,6 +5,13 @@
 pub trait BoundaryCondition {
     /// function which fills the boundary conditions
     fn fill_bc(&mut self, bc_lo: BCType, bc_hi: BCType);
+
+    /// checks if the cell at (i,j,k) contains a valid or a ghost cell. Returns true if valid,
+    /// and returns false if ghost
+    fn ijk_is_valid_cell(&self, i: isize, j: isize, k: isize) -> bool;
+
+    /// check if the cell at p contains a valid or ghost cell. Returns same as ijk_is_valid_cell
+    fn p_is_valid_cell(&self, p: usize) -> bool;
 }
 
 /// Available boundary conditions

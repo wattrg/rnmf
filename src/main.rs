@@ -12,33 +12,40 @@ mod config;
 /// conditions. It also contains an enum `BCType` which lists the available boundary conditions.
 mod boundary_conditions;
 
-
+#[allow(unused_imports)]
 use boundary_conditions::{BCType, BoundaryCondition};
 use crate::mesh::cartesian::*;
 use std::env;
 
-fn main() -> Result<(), std::io::Error> {
+
+fn main()  {
+    // read command line argument
     let args: Vec<String> = env::args().collect();
+    match args.len() > 1 {
+        true => {}
+        false => panic!("please provide the lua configuration file")
+    }
     let conf = config::read_lua(&args[1]).unwrap();
 
-    println!("config = {:?}", conf);
-
-    let u1 = CartesianMesh::new(vec![0.0, 0.0], vec![10.0, 10.0], vec![10, 10], conf.dim);
+    // create the mesh 
+    let u1 = CartesianMesh::new(vec![0.0, 0.0], vec![6.0, 6.0], vec![3, 3], conf.dim);
    
-    let mut variable1 = CartesianDataFrame::new_from(&u1, 1, 2);
+    // create some variables on top of the mesh
+    let mut variable1 = CartesianDataFrame::new_from(&u1, 2, 1);
     let mut variable2 = CartesianDataFrame::new_from(&u1, 1, 2);
 
-    variable1.fill_ic(|_,_,_| 2.0);
-    variable1.fill_bc(BCType::Dirichlet(1.0), BCType::Dirichlet(1.0));
+    // fill the initial conditions
+    variable1.fill_ic(|x,y,_,n| x * y * (n + 1) as f64);
+    variable2.fill_ic(|x,y,_,_| x + y);
 
-    variable2.fill_ic(|_,_,_| 3.0);
-    variable2.fill_bc(BCType::Dirichlet(0.0), BCType::Dirichlet(0.0));
+    // print out the variables
+    println!("variable 1 = {:?}", variable1);
+    println!("");
+    println!("variable 2 = {:?}", variable2);
 
-    println!("{:?}", variable1);
-    println!("{:?}", variable2);
 
-    Ok(())
 
 }
+
 // Hello World!! Kind Regards Gabby <3
 

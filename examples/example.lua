@@ -1,3 +1,1 @@
-print("Hello again from lua!")
-
-dim = 1
+dim = 2
