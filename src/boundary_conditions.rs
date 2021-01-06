@@ -4,7 +4,7 @@
 /// nodes can be filled
 pub trait BoundaryCondition {
     /// function which fills the boundary conditions
-    fn fill_bc(&mut self, bc_lo: BCType, bc_hi: BCType);
+    fn fill_bc(&mut self, bcs: BCs);
 
     /// checks if the cell at (i,j,k) contains a valid or a ghost cell. Returns true if valid,
     /// and returns false if ghost
@@ -27,6 +27,31 @@ pub enum BCType {
     Dirichlet(f64),
 
     /// Evenly reflects data near boundary into ghost nodes
-    Neumann,
+    Neumann(f64),
+}
+
+pub struct ComponentBCs {
+    pub lo: Vec<BCType>,
+    pub hi: Vec<BCType>,
+}
+
+impl ComponentBCs {
+    pub fn new(lo: Vec<BCType>, hi: Vec<BCType>) -> ComponentBCs{
+        ComponentBCs {
+            lo,
+            hi,
+        }
+    }
+}
+
+pub struct BCs {
+    pub bcs: Vec<ComponentBCs>,
+}
+impl BCs {
+    pub fn new(bcs: Vec<ComponentBCs>) -> BCs {
+        BCs {
+            bcs,
+        }
+    }
 }
 

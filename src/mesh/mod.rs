@@ -24,3 +24,6 @@
 /// ```
 /// Once this has been completed, the data is fully initialised, and is ready to be used.
 pub mod cartesian;
+
+
+//pub trait DataFrame: core::ops::IndexMut<(isize, isize, isize, usize)> + IntoIterator{}

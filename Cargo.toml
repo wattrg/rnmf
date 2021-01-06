@@ -4,6 +4,14 @@ version = "0.1.0"
 authors = ["wattrg <wattrg@hotmail.com>"]
 edition = "2018"
 
+[lib]
+name="rnmf"
+path="src/lib.rs"
+
+[[bin]]
+name="rnmf_bin"
+path="src/main.rs"
 
 [dependencies]
 rlua = "0.17.0"
+indicatif = "0.15.0"

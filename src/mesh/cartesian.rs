@@ -2,10 +2,12 @@
 //     - boundary conditions for any dimension
 //     - tests for all dimensions (all tests except boundary conditions have tests for at least
 //       1 and 2 dimensions)
+//     - labels for each cell, so that cells may be marked as a certain type
 
 
-use crate::boundary_conditions::{BCType, BoundaryCondition};
+use crate::boundary_conditions::*;
 use std::rc::Rc;
+//use super::*;
 
 
 /// Structure containing data to define a CartesianMesh
@@ -33,6 +35,7 @@ pub struct CartesianMesh {
     n_nodes: usize
 }
 
+/// provides functionality to assist with indexing of data. This is separate to the index operator
 trait Indexing{
     /// Returns the non-flat index of the item stored at a particular flattened location
     fn get_ijk(&self, p: usize ) -> Option<(isize, isize, isize, usize)>;
@@ -79,6 +82,8 @@ impl CartesianMesh {
         };
 
         // calculate the positions of the nodes
+        // this will be able to be done better by creating an enumerating iterator
+        // which will give (i,j,k,n) to begin with
         cm.node_pos = (0..n_nodes).map(
             |p: usize| -> f64 {
                 let (i,j,k,n) = cm.get_ijk(p).unwrap();
@@ -129,6 +134,7 @@ fn get_flat_index(i: isize, j: isize, k: isize, n: usize,
     p as usize
 }
 
+/// Converts (3+1)D index into a 1D (flattened) index
 fn get_ijk_from_p(p: usize, dimension: &[usize], n_nodes: usize, dim: usize, ng: usize) 
                                                         -> Option<(isize, isize, isize, usize)>{
     if p >= n_nodes {
@@ -172,7 +178,6 @@ fn get_ijk_from_p(p: usize, dimension: &[usize], n_nodes: usize, dim: usize, ng:
 impl Indexing for CartesianMesh
 {
     /// Retrieves the element at (i,j,k,n)
-    #[allow(dead_code)]
     fn index(&self, i: isize, j: isize, k: isize, n: usize) -> & f64
     {
         let p = get_flat_index(i, j, k, n, &self.n, self.dim, 0);
@@ -252,10 +257,14 @@ pub struct CartesianDataFrame{
     /// Reference to the underlying `CartesianMesh`
     pub underlying_mesh: Rc<CartesianMesh>,
 
+    /// The number of components to be stored in the data frame. For example, storing
+    /// a 3D velocity would result in `n_comp = 3`
     pub n_comp: usize,
 
+    /// The total number of individual pieces of information needed to be stored
     n_nodes: usize,
 }
+
 
 /// data structure to store data on CartesianMesh
 impl CartesianDataFrame {
@@ -287,11 +296,11 @@ impl CartesianDataFrame {
     }
 
     /// Fill `CartesianDataFrame` from a initial condition function
-    pub fn fill_ic (&mut self, _ic: fn(f64, f64, f64, usize)->f64)
+    pub fn fill_ic (&mut self, ic: impl Fn(f64, f64, f64, usize)->f64)
     {
         for (pos, val) in self.into_iter().enumerate_pos(){
             let (x,y,z,n) = pos;
-            *val = _ic(x,y,z,n);
+            *val = ic(x,y,z,n);
         }
 
     }
@@ -326,58 +335,158 @@ impl core::ops::Index<(isize, isize, isize, usize)> for CartesianDataFrame{
 
         &self.data[p]
     }
-
 }
 
 
 impl <'a> BoundaryCondition for CartesianDataFrame{
     /// Fill the ghost nodes of the CartesianDataFrame based on BCType
-    fn fill_bc(&mut self, bc_lo: BCType, bc_hi: BCType) {
-        // low boundary condition
-        match bc_lo {
-            BCType::Prescribed(values) => {
-                for (i, &val) in values.iter().rev().enumerate() {
-                    self.data[i] = val;
+    fn fill_bc(&mut self, bc: BCs) {
+        for i_comp in 0..self.n_comp{
+            for i_dim in 0..self.underlying_mesh.dim{
+                let bc_lo = &bc.bcs[i_comp].lo[i_dim];
+                let bc_hi = &bc.bcs[i_comp].hi[i_dim];
+                // low boundary condition
+                match bc_lo {
+                    BCType::Prescribed(values) => {
+                        match self.underlying_mesh.dim {
+                            1 => {
+                                for (i, &val) in values.iter().rev().enumerate() {
+                                    self.data[i] = val;
+                                }
+                            }
+                            _ => {
+                                panic!("Prescribed BC in {}D not supported yet", self.underlying_mesh.dim);
+                            }
+                            
+                        }
+                    }
+                    BCType::Neumann(gradient) => {
+                        match self.underlying_mesh.dim{
+                            1 => {
+                                for i in 0usize..self.n_ghost as usize {
+                                    self.data[self.n_ghost - i - 1] = self.data[self.n_ghost + i];
+                                }
+                            }
+                            2 => {
+                                if self.n_ghost >= 2 {panic!{"more than two ghost cells not supported for Neumann BC yet"};}
+                                for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
+                                    if i_dim == 0 {
+                                        self[(-1, i,0,i_comp)] = self[(1,i,0,i_comp)] - 2.0 * gradient * self.underlying_mesh.dx[i_dim];
+                                    }
+                                    if i_dim == 1 {
+                                        self[(i, -1,0,i_comp)] = self[(i,1,0,i_comp)] - 2.0 * gradient * self.underlying_mesh.dx[i_dim];
+                                    }
+                                }
+                            }
+                            _ => {
+                                panic!("Neumann BC in {}D not supported yet", self.underlying_mesh.dim);
+                            }
+                        }
+                    }
+                    BCType::Dirichlet(value) => {
+                        match self.underlying_mesh.dim {
+                            1 => {
+                                let m: f64 = self.data[self.n_ghost as usize] - value;
+                                for i in 0usize..self.n_ghost as usize {
+                                    self.data[self.n_ghost - i - 1] =
+                                        self.data[self.n_ghost] - 2.0 * (i as f64 + 1.0) * m
+                                }
+                            }
+                            2 => {
+                                for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
+                                    if i_dim == 0{
+                                        let m = -(value - self[(0,i,0,i_comp)]);
+                                        self[(-1,i,0,i_comp)] = self[(0,i,0,i_comp)] - 2.0 * m;
+                                    }
+                                    else if i_dim == 1 {
+                                        let m = -(value - self[(i,0,0,i_comp)]);
+                                        self[(i,-1,0,i_comp)] = self[(i,0,0,i_comp)] - 2.0 * m;
+                                    }
+                                }
+                            }
+                            _ => {
+                                panic!("Dirichlet BC for {}D not yet supported", self.underlying_mesh.dim);
+                            }
+                        }
+                    }
                 }
-            }
-            BCType::Neumann => {
-                for i in 0usize..self.n_ghost as usize {
-                    self.data[self.n_ghost - i - 1] = self.data[self.n_ghost + i];
-                }
-            }
-            BCType::Dirichlet(value) => {
-                let m: f64 = self.data[self.n_ghost as usize] - value;
-                for i in 0usize..self.n_ghost as usize {
-                    self.data[self.n_ghost - i - 1] =
-                        self.data[self.n_ghost] - 2.0 * (i as f64 + 1.0) * m
-                }
-            }
-        }
 
-        // high boundary condition
-        let n: usize = self.data.len() - 1;
-        match bc_hi {
-            BCType::Prescribed(values) => {
-                for (i, val) in values.iter().enumerate() {
-                    self.data[i + self.n_ghost as usize + self.underlying_mesh.n[0]] = *val;
-                }
-            }
-            BCType::Neumann => {
-                for i in 1usize..self.n_ghost as usize + 1 {
-                    self.data[n - (self.n_ghost as usize) + i] =
-                        self.data[n - self.n_ghost as usize - i + 1];
-                }
-            }
-            BCType::Dirichlet(value) => {
-                let m = value - self.data[n - self.n_ghost as usize];
-                for i in 1usize..self.n_ghost as usize + 1 {
-                    self.data[n - (self.n_ghost as usize) + i] =
-                        self.data[n - self.n_ghost as usize] + 2.0 * m * i as f64;
+                // high boundary condition
+                let n: usize = self.data.len() - 1;
+                match bc_hi {
+                    BCType::Prescribed(values) => {
+                        match self.underlying_mesh.dim{
+                            1 => {
+                                for (i, val) in values.iter().enumerate() {
+                                    self.data[i + self.n_ghost as usize + self.underlying_mesh.n[0]] = *val;
+                                }
+                            }
+                            _ => {
+                                panic!{"Prescribed BC in {}D not yet supported", self.underlying_mesh.dim}
+                            }
+                        }
+                    }
+                
+                    BCType::Neumann(gradient) => {
+                        match self.underlying_mesh.dim{
+                            1 => {
+                                for i in 1usize..self.n_ghost as usize + 1 {
+                                    self.data[n - (self.n_ghost as usize) + i] =
+                                        self.data[n - self.n_ghost as usize - i + 1];
+                                }
+                            }
+                            2 => {
+                                if self.n_ghost >= 2 {panic!{"more than two ghost cells not supported for Neumann BC yet"};}
+                                let hi = vec![self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
+                                for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
+                                    if i_dim == 0{
+                                        self[(hi[i_dim], i,0,i_comp)] = self[(hi[i_dim]-2,i,0,i_comp)] + 2.0 * gradient * self.underlying_mesh.dx[i_dim];
+                                    }
+                                    if i_dim == 1 {
+                                        self[(i,hi[i_dim],0,i_comp)] = self[(i,hi[i_dim]-2,0,i_comp)] + 2.0 * gradient * self.underlying_mesh.dx[i_dim];
+                                    }
+                                }
+                                
+                            }
+                            _ => {
+                                panic!{"Neumann BC in {}D not yet supported", self.underlying_mesh.dim}
+                            }
+                        }
+                    }
+                    BCType::Dirichlet(value) => {
+                        match self.underlying_mesh.dim {
+                            1 => { 
+                                let m = value - self.data[n - self.n_ghost as usize];
+                                for i in 1usize..self.n_ghost as usize + 1 {
+                                    self.data[n - (self.n_ghost as usize) + i] =
+                                        self.data[n - self.n_ghost as usize] + 2.0 * m * i as f64;
+                                }
+                            }
+                            2 => {
+                                let hi = vec![self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
+                                for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
+                                    if i_dim == 0{
+                                        let m = value - self[(hi[i_dim]-1,i,0,i_comp)];
+                                        self[(hi[i_dim],i,0,i_comp)] = self[(hi[i_dim]-1,i,0,i_comp)] + 2.0 * m;
+                                    }
+                                    else if i_dim == 1 {
+                                        let m = value - self[(i, hi[i_dim]-1,0,i_comp)];
+                                        self[(i,hi[i_dim],0,i_comp)] = self[(i,hi[i_dim]-1,0,i_comp)] + 2.0 * m;
+                                    }
+                                }
+                            }
+                            _ => {
+                                panic!("Dirichlet BC in {}D not supported yet", self.underlying_mesh.dim);
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
+    /// Determines if the cell at (i,j,k) is a valid cell (returns true) or a ghost
+    /// cell (returns false)
     fn ijk_is_valid_cell(&self, i: isize, j: isize, k: isize) -> bool {
         let above_zero = i >= 0 && j >= 0 && k >= 0;
 
@@ -414,7 +523,6 @@ impl <'a> Iterator for CartesianDataFrameIter<'a> {
     // in practice it can be, and I'm pretty sure that it should be safe for everything we will 
     // ever want to do
     fn next(&mut self) -> Option<Self::Item> {
-        //println!("Calling next on base iterator");
         // progress the current index to skip ghost cells
         while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
                                   !self.df.p_is_valid_cell(self.current_indx) {
@@ -452,10 +560,12 @@ impl <'a> IntoIterator for &'a mut CartesianDataFrame{
     }
 }
 
+/// Struct to iterate over a data frame, with the current index and the data itself
 pub struct EnumerateIndex<'a>{
     iter: CartesianDataFrameIter<'a>,
 }
 
+/// Turns `CartesianDataFrameIter` into an iterator which enumerates over the current index
 pub trait IndexEnumerable <'a> {
     fn enumerate_index(self) -> EnumerateIndex<'a>;
 }
@@ -485,9 +595,12 @@ impl <'a> Iterator for EnumerateIndex<'a> {
     }
 }
 
+/// Structure to iterate over data, giving both the position of the data, and the data itself
 pub struct EnumeratePos<'a>{
     iter: CartesianDataFrameIter<'a>,
 }
+
+/// Turns `CartesianDataFrameIter` into an iterator which enumerates the position of the data
 pub trait PosEnumerable <'a> {
     fn enumerate_pos(self) -> EnumeratePos<'a>;
 }
@@ -518,6 +631,134 @@ impl <'a> Iterator for EnumeratePos<'a> {
                     }
                 }
                 Some(((pos_x, pos_y, pos_z, n), nv))
+            }
+            None => {
+                None
+            }
+        }
+        
+    }
+}
+
+impl std::ops::Mul<CartesianDataFrame> for f64 {
+    type Output = CartesianDataFrame;
+
+    fn mul(self, rhs: CartesianDataFrame) -> Self::Output {
+        let mut result = CartesianDataFrame::new_from(&rhs.underlying_mesh, rhs.n_comp, rhs.n_ghost);
+        for (i, vals) in result.data.iter_mut().enumerate(){
+            *vals = self * rhs.data[i];
+        }
+        result
+    }
+}
+impl std::ops::Mul<&CartesianDataFrame> for f64 {
+    type Output = CartesianDataFrame;
+
+    fn mul(self, rhs: &CartesianDataFrame) -> Self::Output {
+        let mut result = CartesianDataFrame::new_from(&rhs.underlying_mesh, rhs.n_comp, rhs.n_ghost);
+        for (i, vals) in result.data.iter_mut().enumerate(){
+            *vals = self * rhs.data[i];
+        }
+        result
+    }
+}
+
+impl std::ops::Add<&CartesianDataFrame> for &CartesianDataFrame {
+    type Output = CartesianDataFrame;
+
+    fn add(self, rhs: &CartesianDataFrame) -> Self::Output {
+        let mut sum = CartesianDataFrame::new_from(&rhs.underlying_mesh, rhs.n_comp, rhs.n_ghost);
+        for (i, vals) in sum.data.iter_mut().enumerate() {
+            *vals = self.data[i] + rhs.data[i];
+        }
+        sum
+    }
+}
+
+
+//impl DataFrame for CartesianDataFrame {}
+
+
+/// mutable iterator for `CartesianDataFrame`.
+pub struct CartesianDataFrameGhostIter<'a> {
+    df: &'a mut CartesianDataFrame,
+    current_indx: usize,
+}
+
+
+
+impl <'a> Iterator for CartesianDataFrameGhostIter<'a> {
+    type Item = &'a mut f64;
+
+    // this is a safe function wrapping unsafe code. Rust cannot guarantee that it is safe, but
+    // in practice it can be, and I'm pretty sure that it should be safe for everything we will 
+    // ever want to do
+    fn next(&mut self) -> Option<Self::Item> {
+        // progress the current index to skip ghost cells
+        while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
+                                   self.df.p_is_valid_cell(self.current_indx) {
+            self.current_indx += 1;
+        }
+
+        // check if the next item exists
+        if self.current_indx <= self.df.n_nodes-self.df.n_comp 
+                   && !self.df.p_is_valid_cell(self.current_indx){
+            // access and return next item 
+            let ptr = self.df.data.as_mut_ptr();
+            let next_data: Option<Self::Item>;
+            unsafe{
+                next_data = ptr.add(self.current_indx).as_mut();
+            }
+            self.current_indx += 1;
+            next_data
+        }
+        // if the next item doesn't exist, return None
+        else {
+            None
+        }
+    }
+}
+
+pub trait GhostIterator <'a> {
+    fn ghost(self) -> CartesianDataFrameGhostIter<'a>;
+}
+
+impl <'a> GhostIterator <'a> for CartesianDataFrameIter<'a> {
+    fn ghost(self) -> CartesianDataFrameGhostIter<'a> {
+        CartesianDataFrameGhostIter{
+            current_indx: 0,
+            df: self.df,
+        }   
+    }
+}
+
+
+/// Struct to iterate over a data frame, with the current index and the data itself
+pub struct EnumerateGhostIndex<'a>{
+    iter: CartesianDataFrameGhostIter<'a>,
+}
+
+/// Turns `CartesianDataFrameIter` into an iterator which enumerates over the current index
+pub trait GhostIndexEnumerable <'a> {
+    fn enumerate_index(self) -> EnumerateGhostIndex<'a>;
+}
+
+impl <'a> GhostIndexEnumerable <'a> for CartesianDataFrameGhostIter<'a> {
+    fn enumerate_index(self) -> EnumerateGhostIndex<'a> {
+        EnumerateGhostIndex{
+            iter: self,
+        }
+    }
+}
+
+impl <'a> Iterator for EnumerateGhostIndex<'a> {
+    type Item = ((isize, isize, isize, usize), &'a mut f64);
+
+    fn next(&mut self) -> Option<Self::Item>{
+        let next_item = self.iter.next();
+        match next_item{
+            Some(nv) => {
+                Some((self.iter.df.get_ijk(self.iter.current_indx-1).unwrap(), nv))
             }
             None => {
                 None
@@ -605,6 +846,18 @@ mod tests{
     }
 
     #[test]
+    fn ghost_iterator() {
+        let m2 = CartesianMesh::new(vec![0.0, 0.0], vec![10.0, 10.0], vec![5, 5], 2);
+        let mut df = CartesianDataFrame::new_from(&m2, 1, 1);
+        let df_iter = df.into_iter().ghost().enumerate_index();
+        let mut count = 0;
+        for (_, _) in df_iter{
+            count += 1;
+        }
+        assert_eq!(count, 24);
+    }
+
+    #[test]
     fn mesh_iterator () {
         let m = CartesianMesh::new(vec![0.0], vec![10.0], vec![5], 1);
         let mut m_iter = m.into_iter();
@@ -649,6 +902,7 @@ mod tests{
         assert_eq!(m3.get_ijk(22).unwrap(), (1,1,2,0));
         assert_eq!(m3.get_ijk(81), None);
         assert_eq!(m3.index(2,1,0,1), &3.0);
+
     }
 
     #[test]
@@ -726,7 +980,13 @@ mod tests{
         let u1 = CartesianMesh::new(vec![0.0], vec![10.0], vec![5], 1);
         let mut cdf = CartesianDataFrame::new_from(&u1, 1, 2);
         cdf.fill_ic(|x,_,_,_| x + 1.0);
-        cdf.fill_bc(BCType::Dirichlet(0.0), BCType::Dirichlet(1.0));
+        let bc = BCs::new(vec![
+            ComponentBCs::new(
+                    vec![BCType::Dirichlet(0.0)], 
+                    vec![BCType::Dirichlet(1.0)],
+            )]
+        );
+        cdf.fill_bc(bc);
         assert_eq!(
             cdf.data,
             vec![-6.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0, -8.0, -26.0]
@@ -738,7 +998,13 @@ mod tests{
         let u1 = CartesianMesh::new(vec![0.0], vec![10.0], vec![5], 1);
         let mut cdf = CartesianDataFrame::new_from(&u1, 1, 2);
         cdf.fill_ic(|x, _,_,_| x + 1.0);
-        cdf.fill_bc(BCType::Neumann, BCType::Neumann);
+        let bc = BCs::new(vec![
+            ComponentBCs::new(
+                    vec![BCType::Neumann(0.0)], 
+                    vec![BCType::Neumann(1.0)],
+            )]
+        );
+        cdf.fill_bc(bc);
         assert_eq!(
             cdf.data,
             vec![4.0, 2.0, 2.0, 4.0, 6.0, 8.0, 10.0, 10.0, 8.0]
@@ -750,10 +1016,13 @@ mod tests{
         let u1 = CartesianMesh::new(vec![0.0], vec![10.0], vec![5], 1);
         let mut cdf = CartesianDataFrame::new_from(&u1, 1, 2);
         cdf.fill_ic(|x, _,_,_| x + 1.0);
-        cdf.fill_bc(
-            BCType::Prescribed(vec![-1.0, -2.0]),
-            BCType::Prescribed(vec![15.0, 16.0]),
+        let bc = BCs::new(vec![
+            ComponentBCs::new(
+                    vec![BCType::Prescribed(vec![-1.0, -2.0])], 
+                    vec![BCType::Prescribed(vec![15.0, 16.0])],
+            )]
         );
+        cdf.fill_bc(bc);
         assert_eq!(
             cdf.data,
             vec![-2.0, -1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 15.0, 16.0]

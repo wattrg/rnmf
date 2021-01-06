@@ -36,4 +36,3 @@ pub fn read_lua(lua_loc: &str) -> Result<Config, std::io::Error>{
     });
     Ok(conf)
 }
-
