@@ -244,7 +244,7 @@ impl <'a> IntoIterator for &'a CartesianMesh {
 
 // ********************************* Cartesian data frame ****************************************
 /// Structure to store data defined on a `CartesianMesh`
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CartesianDataFrame{
     /// The data is stored here
     pub data: Vec<f64>,
@@ -340,7 +340,7 @@ impl core::ops::Index<(isize, isize, isize, usize)> for CartesianDataFrame{
 
 impl <'a> BoundaryCondition for CartesianDataFrame{
     /// Fill the ghost nodes of the CartesianDataFrame based on BCType
-    fn fill_bc(&mut self, bc: BCs) {
+    fn fill_bc (&mut self, bc: &BCs) {
         for i_comp in 0..self.n_comp{
             for i_dim in 0..self.underlying_mesh.dim{
                 let bc_lo = &bc.bcs[i_comp].lo[i_dim];
@@ -675,6 +675,20 @@ impl std::ops::Add<&CartesianDataFrame> for &CartesianDataFrame {
     }
 }
 
+impl std::ops::Mul<&CartesianDataFrame> for &CartesianDataFrame {
+    type Output = CartesianDataFrame;
+
+    fn mul(self, rhs: &CartesianDataFrame) -> Self::Output {
+        let mut result = CartesianDataFrame::new_from(&rhs.underlying_mesh, rhs.n_comp, rhs.n_ghost);
+        for (i, vals) in result.data.iter_mut().enumerate(){
+            *vals = self.data[i] * rhs.data[i];
+        }
+        result
+    }
+}
+
+
+
 
 //impl DataFrame for CartesianDataFrame {}
 
@@ -986,7 +1000,7 @@ mod tests{
                     vec![BCType::Dirichlet(1.0)],
             )]
         );
-        cdf.fill_bc(bc);
+        cdf.fill_bc(&bc);
         assert_eq!(
             cdf.data,
             vec![-6.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0, -8.0, -26.0]
@@ -1004,7 +1018,7 @@ mod tests{
                     vec![BCType::Neumann(1.0)],
             )]
         );
-        cdf.fill_bc(bc);
+        cdf.fill_bc(&bc);
         assert_eq!(
             cdf.data,
             vec![4.0, 2.0, 2.0, 4.0, 6.0, 8.0, 10.0, 10.0, 8.0]
@@ -1022,7 +1036,7 @@ mod tests{
                     vec![BCType::Prescribed(vec![15.0, 16.0])],
             )]
         );
-        cdf.fill_bc(bc);
+        cdf.fill_bc(&bc);
         assert_eq!(
             cdf.data,
             vec![-2.0, -1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 15.0, 16.0]

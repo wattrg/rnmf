@@ -33,7 +33,7 @@ fn main()  {
         )]
     );
 
-    variable2.fill_bc(bc);
+    variable2.fill_bc(&bc);
 
     // print out the variables
     println!("variable 1 = {:?}", variable1);

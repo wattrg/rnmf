@@ -4,7 +4,7 @@
 /// nodes can be filled
 pub trait BoundaryCondition {
     /// function which fills the boundary conditions
-    fn fill_bc(&mut self, bcs: BCs);
+    fn fill_bc(&mut self, bcs: &BCs);
 
     /// checks if the cell at (i,j,k) contains a valid or a ghost cell. Returns true if valid,
     /// and returns false if ghost

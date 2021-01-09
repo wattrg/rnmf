@@ -4,7 +4,6 @@ use std::io::prelude::*;
 
 pub use indicatif::{ProgressBar, ProgressStyle};
 
-// console output
 pub trait RnmfProgressBar {
     fn create (increments: usize) -> ProgressBar;
     fn increment (&mut self, size: usize);
@@ -15,8 +14,8 @@ pub trait RnmfProgressBar {
 impl RnmfProgressBar for ProgressBar {
     fn create (increments: usize) -> ProgressBar {
         let sty = ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>7}/{len:7} (eta: {eta_precise})")
-            .progress_chars("##-");
+            .template("{spinner:.yellow} [{elapsed_precise}] [{bar:40.green/yellow}] {pos:>7}/{len:7} (eta: {eta_precise})")
+            .progress_chars("==> ");
         let pb = ProgressBar::new(increments as u64);
         pb.set_style(sty);
         pb
@@ -30,7 +29,7 @@ impl RnmfProgressBar for ProgressBar {
     }
 }
 
-pub fn write_csv(name: &str, mut data: CartesianDataFrame) -> CartesianDataFrame{
+pub fn write_csv(name: &str, mut data: CartesianDataFrame){
     let mut file = File::create(format!("{}.csv",name)).unwrap();
     let n = data.underlying_mesh.n[0] as isize;
     print!("  writing csv...");
@@ -43,6 +42,5 @@ pub fn write_csv(name: &str, mut data: CartesianDataFrame) -> CartesianDataFrame
             file.write_all(b",").unwrap();
         }
     }
-    print!("done\n");
-    data
+    println!(" done");
 }

@@ -15,3 +15,4 @@ path="src/main.rs"
 [dependencies]
 rlua = "0.17.0"
 indicatif = "0.15.0"
+rand = "0.8"
