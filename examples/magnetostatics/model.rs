@@ -1,17 +1,18 @@
 use rlua::{Lua};
 use std::fs;
+use crate::Real;
 
 #[derive(Clone)]
 pub struct ModelConfig {
-    pub h_far: Vec<f64>,
-    pub length: Vec<f64>,
+    pub h_far: Vec<Real>,
+    pub length: Vec<Real>,
     pub n_cells: Vec<usize>,
-    pub relax: f64,
+    pub relax: Real,
     pub n_iter: usize,
     pub n_sub_iter: usize,
-    pub bubble_centre: Vec<f64>,
-    pub bubble_radius: f64,
-    pub mu: Vec<f64>,
+    pub bubble_centre: Vec<Real>,
+    pub bubble_radius: Real,
+    pub mu: Vec<Real>,
 }
 
 
@@ -48,11 +49,11 @@ pub fn read_lua(lua_loc: &str) -> Result<ModelConfig, std::io::Error>{
                .expect("failed executing lua file");
 
         // set configuration data for rust
-        model_conf.h_far = globals.get::<_,Vec<f64>>("H_far")
+        model_conf.h_far = globals.get::<_,Vec<Real>>("H_far")
                                 .expect("failed setting dimensionality");
         println!("Set h_far to {:?}", model_conf.h_far);
 
-        model_conf.length = globals.get::<_,Vec<f64>>("length")
+        model_conf.length = globals.get::<_,Vec<Real>>("length")
                                 .expect("failed setting domain length");
         println!("Set length to {:?}", model_conf.length);
 
@@ -60,7 +61,7 @@ pub fn read_lua(lua_loc: &str) -> Result<ModelConfig, std::io::Error>{
                                 .expect("failed setting number of cells");
         println!("Set n_cells to {:?}", model_conf.n_cells);
 
-        model_conf.relax = globals.get::<_,f64>("relax")
+        model_conf.relax = globals.get::<_,Real>("relax")
                                 .expect("failed setting relaxation coefficient");
         println!("Set relaxation coefficient to {}", model_conf.relax);
 
@@ -72,15 +73,15 @@ pub fn read_lua(lua_loc: &str) -> Result<ModelConfig, std::io::Error>{
                                     .expect("failed setting n_sub_iter");
         println!("Set n_sub_iter to {}", model_conf.n_sub_iter);
 
-        model_conf.bubble_centre = globals.get::<_,Vec<f64>>("bubble_centre")
+        model_conf.bubble_centre = globals.get::<_,Vec<Real>>("bubble_centre")
                                         .expect("failed setting bubble_centre");
         println!("Set bubble centre to {:?}", model_conf.bubble_centre);
 
-        model_conf.bubble_radius = globals.get::<_,f64>("bubble_radius")
+        model_conf.bubble_radius = globals.get::<_,Real>("bubble_radius")
                                         .expect("failed setting bubble radius");
         println!("Set bubble radius to {}", model_conf.bubble_radius);
 
-        model_conf.mu = globals.get::<_,Vec<f64>>("mu")
+        model_conf.mu = globals.get::<_,Vec<Real>>("mu")
                                 .expect("failed setting mu");
         println!("Set mu_1 to {:?}", model_conf.mu);
         println!();

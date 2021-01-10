@@ -1,6 +1,7 @@
 use crate::mesh::cartesian::*;
 use std::fs::File;
 use std::io::prelude::*;
+use vtkio::model::*;
 
 pub use indicatif::{ProgressBar, ProgressStyle};
 
@@ -44,3 +45,7 @@ pub fn write_csv(name: &str, mut data: CartesianDataFrame){
     }
     println!(" done");
 }
+
+// pub fn write_vtk(iter: usize, data: CartesianDataFrame){
+
+// }

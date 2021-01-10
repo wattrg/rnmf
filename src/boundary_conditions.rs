@@ -1,3 +1,5 @@
+use crate::Real;
+
 
 // ****************** Define traits all data frames must have *****************
 /// All data frames must have a `BoundaryCondition` trait, so that the ghost
@@ -20,14 +22,14 @@ pub enum BCType {
     /// user supplies a vector which is placed into ghost cells.
     /// The first entry in the vector is put in the ghost cell closest to
     /// the valid computational domain
-    Prescribed(Vec<f64>),
+    Prescribed(Vec<Real>),
 
     /// Linearly extrapolates ghost cells from the data in the valid region,
     /// so that the value on the boundary is the value supplied by the user
-    Dirichlet(f64),
+    Dirichlet(Real),
 
     /// Evenly reflects data near boundary into ghost nodes
-    Neumann(f64),
+    Neumann(Real),
 }
 
 pub struct ComponentBCs {

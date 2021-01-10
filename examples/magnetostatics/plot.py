@@ -21,5 +21,5 @@ X,Y = np.meshgrid(x,y)
 
 plt.imshow(np.sqrt(Hx**2 + Hy**2))
 plt.colorbar()
-plt.streamplot(X,Y,Hx,Hy)
+#plt.streamplot(X,Y,Hx,Hy)
 plt.show()

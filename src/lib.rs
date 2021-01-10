@@ -14,3 +14,9 @@ pub mod config;
 pub mod boundary_conditions;
 
 pub mod io;
+
+#[cfg(feature="double_precision")]
+pub type Real = f64;
+
+#[cfg(not(feature="double_precision"))]
+pub type Real = f32;

@@ -20,7 +20,7 @@ fn main()  {
     let mut variable2 = CartesianDataFrame::new_from(&u1, 1, 1);
 
     // fill the initial conditions
-    variable1.fill_ic(|x,y,_,n| x * y * (n + 1) as f64);
+    variable1.fill_ic(|x,y,_,n| x * y * (n + 1) as Real);
     variable2.fill_ic(|x,y,_,_| x + y);
 
     let bc = BCs::new(vec![

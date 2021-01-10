@@ -7,10 +7,13 @@ use mesh::cartesian::*;
 use std::env;
 use poisson::*;
 use io::{RnmfProgressBar};
-//use rand::Rng;
 
 fn main() {
     println!("Hello from the magnetistatics example!");
+
+    if cfg!(feature = "double_precision") {
+        println!("using double precision");
+    }
 
     // read command line argument
     let args: Vec<String> = env::args().collect();
@@ -47,7 +50,7 @@ fn main() {
 
     // create the data frame
     let mut psi = CartesianDataFrame::new_from(&mesh, 1, 1);
-    psi.fill_ic(|x,y,_,_| -> f64 {
+    psi.fill_ic(|x,y,_,_| -> Real {
         -model_conf.h_far[0]/mesh.dx[0]*x - model_conf.h_far[1]/mesh.dx[1]*y
         
     });

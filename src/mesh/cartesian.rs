@@ -7,6 +7,7 @@
 
 use crate::boundary_conditions::*;
 use std::rc::Rc;
+use crate::Real;
 //use super::*;
 
 
@@ -14,19 +15,19 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub struct CartesianMesh {
     /// The position of the nodes in the mesh
-    pub node_pos: Vec<f64>,
+    pub node_pos: Vec<Real>,
 
     /// The lower corner of the mesh
-    pub lo: Vec<f64>,
+    pub lo: Vec<Real>,
 
     /// The upper corner of the mesh
-    pub hi: Vec<f64>,
+    pub hi: Vec<Real>,
 
     /// The number of cells in nodes in each direction
     pub n : Vec<usize>,
 
     /// The distance between each node in each
-    pub dx: Vec<f64>,
+    pub dx: Vec<Real>,
 
     /// The number of spatial dimensions of the mesh
     pub dim: usize,
@@ -41,18 +42,18 @@ trait Indexing{
     fn get_ijk(&self, p: usize ) -> Option<(isize, isize, isize, usize)>;
 
     /// Returns a borrow to the value stored at a particular non-flat index
-    fn index(&self, i: isize, j: isize, k: isize, n: usize) -> &f64;
+    fn index(&self, i: isize, j: isize, k: isize, n: usize) -> &Real;
 }
 
 
 impl CartesianMesh {
     /// Generate new CartesianMesh from the lo and high corner, 
     /// and the number of nodes
-    pub fn new(lo: Vec<f64>, hi: Vec<f64>, n:Vec<usize>, dim: usize) -> Rc<CartesianMesh>
+    pub fn new(lo: Vec<Real>, hi: Vec<Real>, n:Vec<usize>, dim: usize) -> Rc<CartesianMesh>
     {
         let mut dx = vec![0.0; dim as usize];
         for i_dim in 0..dim as usize{
-            dx[i_dim] = (hi[i_dim] - lo[i_dim])/(n[i_dim] as f64);
+            dx[i_dim] = (hi[i_dim] - lo[i_dim])/(n[i_dim] as Real);
         }
 
         // calculate the capacity of the vector required to store all the node positions
@@ -85,24 +86,24 @@ impl CartesianMesh {
         // this will be able to be done better by creating an enumerating iterator
         // which will give (i,j,k,n) to begin with
         cm.node_pos = (0..n_nodes).map(
-            |p: usize| -> f64 {
+            |p: usize| -> Real {
                 let (i,j,k,n) = cm.get_ijk(p).unwrap();
                 match dim {
                     1 => {
-                        cm.lo[n] + ((i as f64) + 0.5) * cm.dx[n]
+                        cm.lo[n] + ((i as Real) + 0.5) * cm.dx[n]
                     }
                     2 => {
                         match n {
-                            0 => {cm.lo[n] + ((i as f64) + 0.5) * cm.dx[n]}
-                            1 => {cm.lo[n] + ((j as f64) + 0.5) * cm.dx[n]}
+                            0 => {cm.lo[n] + ((i as Real) + 0.5) * cm.dx[n]}
+                            1 => {cm.lo[n] + ((j as Real) + 0.5) * cm.dx[n]}
                             _ => {panic!("n cannot be {} in {}D", n, dim)}
                         }
                     }
                     3 => {
                         match n{
-                            0 => {cm.lo[n] + ((i as f64) + 0.5) * cm.dx[n]}
-                            1 => {cm.lo[n] + ((j as f64) + 0.5) * cm.dx[n]}
-                            2 => {cm.lo[n] + ((k as f64) + 0.5) * cm.dx[n]}
+                            0 => {cm.lo[n] + ((i as Real) + 0.5) * cm.dx[n]}
+                            1 => {cm.lo[n] + ((j as Real) + 0.5) * cm.dx[n]}
+                            2 => {cm.lo[n] + ((k as Real) + 0.5) * cm.dx[n]}
                             _ => {panic!("n cannot be {} in {}D", n, dim)}
                         }
                     }
@@ -178,7 +179,7 @@ fn get_ijk_from_p(p: usize, dimension: &[usize], n_nodes: usize, dim: usize, ng:
 impl Indexing for CartesianMesh
 {
     /// Retrieves the element at (i,j,k,n)
-    fn index(&self, i: isize, j: isize, k: isize, n: usize) -> & f64
+    fn index(&self, i: isize, j: isize, k: isize, n: usize) -> & Real
     {
         let p = get_flat_index(i, j, k, n, &self.n, self.dim, 0);
         let np = self.node_pos.get(p as usize);
@@ -207,7 +208,7 @@ impl <'a> Iterator for CartesianMeshIter<'a>{
     // return a vector of references instead of slice because the length of the returned object
     // depends on the number of dimensions, and thus is not known at compile time, so slices
     // won't work
-    type Item = Vec<&'a f64>;
+    type Item = Vec<&'a Real>;
     
     fn next(& mut self) -> Option<Self::Item>{
         // If the next position doesn't exist, return None
@@ -229,7 +230,7 @@ impl <'a> Iterator for CartesianMeshIter<'a>{
 }
 
 impl <'a> IntoIterator for &'a CartesianMesh {
-    type Item = Vec<&'a f64>;
+    type Item = Vec<&'a Real>;
     type IntoIter = CartesianMeshIter<'a>;
 
     fn into_iter(self) -> CartesianMeshIter<'a> {
@@ -247,7 +248,7 @@ impl <'a> IntoIterator for &'a CartesianMesh {
 #[derive(Debug, Clone)]
 pub struct CartesianDataFrame{
     /// The data is stored here
-    pub data: Vec<f64>,
+    pub data: Vec<Real>,
 
     /// The number of ghost nodes, added to each side of the underlying `CartesianMesh`
     pub n_ghost: usize,
@@ -296,7 +297,7 @@ impl CartesianDataFrame {
     }
 
     /// Fill `CartesianDataFrame` from a initial condition function
-    pub fn fill_ic (&mut self, ic: impl Fn(f64, f64, f64, usize)->f64)
+    pub fn fill_ic (&mut self, ic: impl Fn(Real, Real, Real, usize)->Real)
     {
         for (pos, val) in self.into_iter().enumerate_pos(){
             let (x,y,z,n) = pos;
@@ -314,7 +315,7 @@ impl CartesianDataFrame {
 impl core::ops::IndexMut<(isize, isize, isize, usize)> for CartesianDataFrame {
     /// Exclusively borrows element at (i,j,k,n). The valid cells are indexed from zero 
     /// and ghost cells at the lower side of the domain are indexed with negative numbers
-    fn index_mut(&mut self, indx: (isize, isize,isize,usize)) -> &mut f64 {
+    fn index_mut(&mut self, indx: (isize, isize,isize,usize)) -> &mut Real {
         let (i,j,k,n) = indx;
         let p = get_flat_index(i,j,k,n,&self.n_grown,self.underlying_mesh.dim,self.n_ghost);
         &mut self.data[p]
@@ -323,13 +324,13 @@ impl core::ops::IndexMut<(isize, isize, isize, usize)> for CartesianDataFrame {
 
 
 impl core::ops::Index<(isize, isize, isize, usize)> for CartesianDataFrame{
-    type Output = f64;
+    type Output = Real;
 
     #[allow(dead_code)] 
     /// Borrows the element at (i,j,k,n). The valid cells are indexed from zero
     /// and ghost cells at the lower side of the domain are indexed with negative
     /// numbers.
-    fn index(&self, indx: (isize, isize, isize, usize) ) -> &f64 {
+    fn index(&self, indx: (isize, isize, isize, usize) ) -> &Real {
         let (i,j,k,n) = indx;
         let p = get_flat_index(i, j, k, n, &self.n_grown, self.underlying_mesh.dim, self.n_ghost);
 
@@ -386,10 +387,10 @@ impl <'a> BoundaryCondition for CartesianDataFrame{
                     BCType::Dirichlet(value) => {
                         match self.underlying_mesh.dim {
                             1 => {
-                                let m: f64 = self.data[self.n_ghost as usize] - value;
+                                let m: Real = self.data[self.n_ghost as usize] - value;
                                 for i in 0usize..self.n_ghost as usize {
                                     self.data[self.n_ghost - i - 1] =
-                                        self.data[self.n_ghost] - 2.0 * (i as f64 + 1.0) * m
+                                        self.data[self.n_ghost] - 2.0 * (i as Real + 1.0) * m
                                 }
                             }
                             2 => {
@@ -459,7 +460,7 @@ impl <'a> BoundaryCondition for CartesianDataFrame{
                                 let m = value - self.data[n - self.n_ghost as usize];
                                 for i in 1usize..self.n_ghost as usize + 1 {
                                     self.data[n - (self.n_ghost as usize) + i] =
-                                        self.data[n - self.n_ghost as usize] + 2.0 * m * i as f64;
+                                        self.data[n - self.n_ghost as usize] + 2.0 * m * i as Real;
                                 }
                             }
                             2 => {
@@ -517,7 +518,7 @@ pub struct CartesianDataFrameIter<'a> {
 
 
 impl <'a> Iterator for CartesianDataFrameIter<'a> {
-    type Item = &'a mut f64;
+    type Item = &'a mut Real;
 
     // this is a safe function wrapping unsafe code. Rust cannot guarantee that it is safe, but
     // in practice it can be, and I'm pretty sure that it should be safe for everything we will 
@@ -549,7 +550,7 @@ impl <'a> Iterator for CartesianDataFrameIter<'a> {
 }
 
 impl <'a> IntoIterator for &'a mut CartesianDataFrame{
-    type Item = &'a mut f64;
+    type Item = &'a mut Real;
     type IntoIter = CartesianDataFrameIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter{
@@ -579,7 +580,7 @@ impl <'a> IndexEnumerable <'a> for CartesianDataFrameIter<'a> {
 }
 
 impl <'a> Iterator for EnumerateIndex<'a> {
-    type Item = ((isize, isize, isize, usize), &'a mut f64);
+    type Item = ((isize, isize, isize, usize), &'a mut Real);
 
     fn next(&mut self) -> Option<Self::Item>{
         let next_item = self.iter.next();
@@ -614,7 +615,7 @@ impl <'a> PosEnumerable <'a> for CartesianDataFrameIter<'a> {
 }
 
 impl <'a> Iterator for EnumeratePos<'a> {
-    type Item = ((f64, f64, f64, usize), &'a mut f64);
+    type Item = ((Real, Real, Real, usize), &'a mut Real);
 
     fn next(&mut self) -> Option<Self::Item>{
         let next_item = self.iter.next();
@@ -640,7 +641,7 @@ impl <'a> Iterator for EnumeratePos<'a> {
     }
 }
 
-impl std::ops::Mul<CartesianDataFrame> for f64 {
+impl std::ops::Mul<CartesianDataFrame> for Real {
     type Output = CartesianDataFrame;
 
     fn mul(self, rhs: CartesianDataFrame) -> Self::Output {
@@ -651,7 +652,7 @@ impl std::ops::Mul<CartesianDataFrame> for f64 {
         result
     }
 }
-impl std::ops::Mul<&CartesianDataFrame> for f64 {
+impl std::ops::Mul<&CartesianDataFrame> for Real {
     type Output = CartesianDataFrame;
 
     fn mul(self, rhs: &CartesianDataFrame) -> Self::Output {
@@ -702,7 +703,7 @@ pub struct CartesianDataFrameGhostIter<'a> {
 
 
 impl <'a> Iterator for CartesianDataFrameGhostIter<'a> {
-    type Item = &'a mut f64;
+    type Item = &'a mut Real;
 
     // this is a safe function wrapping unsafe code. Rust cannot guarantee that it is safe, but
     // in practice it can be, and I'm pretty sure that it should be safe for everything we will 
@@ -766,7 +767,7 @@ impl <'a> GhostIndexEnumerable <'a> for CartesianDataFrameGhostIter<'a> {
 }
 
 impl <'a> Iterator for EnumerateGhostIndex<'a> {
-    type Item = ((isize, isize, isize, usize), &'a mut f64);
+    type Item = ((isize, isize, isize, usize), &'a mut Real);
 
     fn next(&mut self) -> Option<Self::Item>{
         let next_item = self.iter.next();

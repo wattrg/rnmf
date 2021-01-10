@@ -12,7 +12,11 @@ path="src/lib.rs"
 name="rnmf_bin"
 path="src/main.rs"
 
+[features]
+default = ["double_precision"]
+double_precision = []
+
 [dependencies]
 rlua = "0.17.0"
 indicatif = "0.15.0"
-rand = "0.8"
+vtkio = "0.5"

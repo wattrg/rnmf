@@ -2,8 +2,7 @@
 use super::mesh::cartesian::*;
 use super::boundary_conditions::*;
 use super::model::ModelConfig;
-
-
+use rnmf::Real;
 
 fn get_laplace(phi: &CartesianDataFrame, model: &ModelConfig) -> CartesianDataFrame {
     let mut lap = CartesianDataFrame::new_from(&phi.underlying_mesh, 1, 1);
@@ -38,9 +37,9 @@ pub fn get_source(phi: &CartesianDataFrame, model: &ModelConfig) -> CartesianDat
 }
 
 
-fn is_inside(i: isize, j: isize, dx: &[f64], model: &ModelConfig) -> bool{
-    let x_pos = (i as f64 + 0.5) * dx[0];
-    let y_pos = (j as f64 + 0.5) * dx[1];
+fn is_inside(i: isize, j: isize, dx: &[Real], model: &ModelConfig) -> bool{
+    let x_pos = (i as Real + 0.5) * dx[0];
+    let y_pos = (j as Real + 0.5) * dx[1];
 
     let x_dist = (x_pos - model.bubble_centre[0]).abs();
     let y_dist = (y_pos - model.bubble_centre[1]).abs();
@@ -48,7 +47,7 @@ fn is_inside(i: isize, j: isize, dx: &[f64], model: &ModelConfig) -> bool{
     x_dist * x_dist + y_dist * y_dist <= model.bubble_radius*model.bubble_radius
 }
 
-fn mu(i: isize, j: isize, dx: &[f64], model: & ModelConfig) -> f64 {
+fn mu(i: isize, j: isize, dx: &[Real], model: & ModelConfig) -> Real {
     if is_inside(i, j, dx, model){
         model.mu[0]
     }
