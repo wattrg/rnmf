@@ -1,6 +1,6 @@
 use rnmf::*;
 use boundary_conditions::*;
-use crate::mesh::cartesian::*;
+use crate::mesh::cartesian_any_d::*;
 use std::env;
 
 fn main()  {

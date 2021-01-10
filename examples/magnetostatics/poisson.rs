@@ -1,19 +1,19 @@
 
-use super::mesh::cartesian::*;
+use super::mesh::cartesian2d::*;
 use super::boundary_conditions::*;
 use super::model::ModelConfig;
 use rnmf::Real;
 
-fn get_laplace(phi: &CartesianDataFrame, model: &ModelConfig) -> CartesianDataFrame {
-    let mut lap = CartesianDataFrame::new_from(&phi.underlying_mesh, 1, 1);
+fn get_laplace(phi: &CartesianDataFrame2D, model: &ModelConfig) -> CartesianDataFrame2D {
+    let mut lap = CartesianDataFrame2D::new_from(&phi.underlying_mesh, 1, 1);
     let dx = &phi.underlying_mesh.dx;
     for i in 0..phi.underlying_mesh.n[0] as isize {
         for j in 0..phi.underlying_mesh.n[1] as isize {
-            lap[(i,j,0,0)] = phi[(i+1,j  ,0,0)]*(mu(i+1,j  ,dx,model) + mu(i,j,dx,model))/2.0
-                           + phi[(i-1,j  ,0,0)]*(mu(i-1,j  ,dx,model) + mu(i,j,dx,model))/2.0
-                           + phi[(i  ,j+1,0,0)]*(mu(i  ,j+1,dx,model) + mu(i,j,dx,model))/2.0
-                           + phi[(i  ,j-1,0,0)]*(mu(i  ,j-1,dx,model) + mu(i,j,dx,model))/2.0
-                           - phi[(i  ,j  ,0,0)]*(mu(i+1,j  ,dx,model) + mu(i-1,j,dx,model)+mu(i,j+1,dx,model)+mu(i,j-1,dx,model)+4.0*mu(i,j,dx,model))/2.0;
+            lap[(i,j,0)] = phi[(i+1,j  ,0)]*(mu(i+1,j  ,dx,model) + mu(i,j,dx,model))/2.0
+                         + phi[(i-1,j  ,0)]*(mu(i-1,j  ,dx,model) + mu(i,j,dx,model))/2.0
+                         + phi[(i  ,j+1,0)]*(mu(i  ,j+1,dx,model) + mu(i,j,dx,model))/2.0
+                         + phi[(i  ,j-1,0)]*(mu(i  ,j-1,dx,model) + mu(i,j,dx,model))/2.0
+                         - phi[(i  ,j  ,0)]*(mu(i+1,j  ,dx,model) + mu(i-1,j,dx,model)+mu(i,j+1,dx,model)+mu(i,j-1,dx,model)+4.0*mu(i,j,dx,model))/2.0;
         }
     }
     let bc = BCs::new(
@@ -28,9 +28,9 @@ fn get_laplace(phi: &CartesianDataFrame, model: &ModelConfig) -> CartesianDataFr
     lap
 }
 
-pub fn get_source(phi: &CartesianDataFrame, model: &ModelConfig) -> CartesianDataFrame {
-    let mut source = CartesianDataFrame::new_from(&phi.underlying_mesh, 1, 1);
-    for ((i,j,_,_), src) in source.into_iter().enumerate_index(){
+pub fn get_source(phi: &CartesianDataFrame2D, model: &ModelConfig) -> CartesianDataFrame2D {
+    let mut source = CartesianDataFrame2D::new_from(&phi.underlying_mesh, 1, 1);
+    for ((i,j,_), src) in source.into_iter().enumerate_index(){
         *src = -(1.0 - 1.0/model.relax)/mu(i,j,&phi.underlying_mesh.dx, model);
     }
     &source * &get_laplace(phi, model)
@@ -57,10 +57,10 @@ fn mu(i: isize, j: isize, dx: &[Real], model: & ModelConfig) -> Real {
 }
 
 
-pub fn solve_poisson(psi_init: &CartesianDataFrame, 
-                     rhs: &CartesianDataFrame, 
+pub fn solve_poisson(psi_init: &CartesianDataFrame2D, 
+                     rhs: &CartesianDataFrame2D, 
                      model: &ModelConfig,
-                     bc: &BCs) -> CartesianDataFrame{
+                     bc: &BCs) -> CartesianDataFrame2D{
 
     let mut psi = psi_init.clone();
     let dx2 = psi.underlying_mesh.dx[0].powf(2.0);
@@ -73,9 +73,9 @@ pub fn solve_poisson(psi_init: &CartesianDataFrame,
     for _ in 0..model.n_sub_iter {
         for i in 0..psi.underlying_mesh.n[0] as isize{
             for j in 0..psi.underlying_mesh.n[1] as isize {
-                psi[(i,j,0,0)] = alpha * rhs[(i,j,0,0)] + 
-                                 beta * (psi[(i+1,j,0,0)] + psi[(i-1,j,0,0)]) + 
-                                 gamma * (psi[(i,j+1,0,0)] + psi[(i,j-1,0,0)]);
+                psi[(i,j,0)] = alpha * rhs[(i,j,0)] + 
+                                 beta * (psi[(i+1,j,0)] + psi[(i-1,j,0)]) + 
+                                 gamma * (psi[(i,j+1,0)] + psi[(i,j-1,0)]);
             }
         }
         psi.fill_bc(&bc);

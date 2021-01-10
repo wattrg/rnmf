@@ -3,7 +3,7 @@ mod model;
 
 use rnmf::*;
 use boundary_conditions::*;
-use mesh::cartesian::*;
+use mesh::cartesian2d::*;
 use std::env;
 use poisson::*;
 use io::{RnmfProgressBar};
@@ -23,17 +23,15 @@ fn main() {
     }
 
     // read lua file
-    let conf = config::read_lua(&args[1]).unwrap();
     let model_conf = model::read_lua(&args[1]).unwrap();
 
 
 
     // create the mesh 
-    let mesh = CartesianMesh::new(
+    let mesh = CartesianMesh2D::new(
         vec![0.0, 0.0],                                     // lo corner
         vec![model_conf.length[0], model_conf.length[1]],   // hi corner
-        vec![model_conf.n_cells[0], model_conf.n_cells[1]], // number of cells
-        conf.dim                                            // dimensions
+        vec![model_conf.n_cells[0], model_conf.n_cells[1]]  // number of cells
     );
 
 
@@ -49,13 +47,13 @@ fn main() {
     ]);
 
     // create the data frame
-    let mut psi = CartesianDataFrame::new_from(&mesh, 1, 1);
-    psi.fill_ic(|x,y,_,_| -> Real {
+    let mut psi = CartesianDataFrame2D::new_from(&mesh, 1, 1);
+    psi.fill_ic(|x,y,_| -> Real {
         -model_conf.h_far[0]/mesh.dx[0]*x - model_conf.h_far[1]/mesh.dx[1]*y
         
     });
     psi.fill_bc(&bc);
-    io::write_csv(&"./examples/magnetostatics/psi_initial", psi.clone());
+    io::write_csv_2d(&"./examples/magnetostatics/psi_initial", psi.clone());
 
     // begin solving
     println!("Overall progress:");
@@ -71,8 +69,8 @@ fn main() {
     }
     progress_bar.finish();
 
-    io::write_csv(&"./examples/magnetostatics/psi_final", psi);
-    io::write_csv(&"./examples/magnetostatics/source", source);
+    io::write_csv_2d(&"./examples/magnetostatics/psi_final", psi);
+    io::write_csv_2d(&"./examples/magnetostatics/source", source);
     println!("Done.");
 
 }
