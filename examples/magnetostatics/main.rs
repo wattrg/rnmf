@@ -7,11 +7,18 @@ use mesh::cartesian2d::*;
 use std::env;
 use poisson::*;
 use io::{RnmfProgressBar};
+use colored::*;
+use std::process::Command;
 
 fn main() {
+    let version = env!("CARGO_PKG_VERSION");
+    let commit = String::from_utf8(Command::new("git").args(&["rev-parse", "HEAD"]).output().unwrap().stdout).unwrap();
+
+    print!("{}", format!("rnmf v {}, commit {}", version, commit).green().bold());
     println!("Hello from the magnetistatics example!");
 
-    if cfg!(feature = "double_precision") {
+
+    if !cfg!(feature = "disable_double") {
         println!("using double precision");
     }
 
@@ -29,9 +36,9 @@ fn main() {
 
     // create the mesh 
     let mesh = CartesianMesh2D::new(
-        vec![0.0, 0.0],                                     // lo corner
-        vec![model_conf.length[0], model_conf.length[1]],   // hi corner
-        vec![model_conf.n_cells[0], model_conf.n_cells[1]]  // number of cells
+        [0.0, 0.0],                                     // lo corner
+        [model_conf.length[0], model_conf.length[1]],   // hi corner
+        [model_conf.n_cells[0], model_conf.n_cells[1]]  // number of cells
     );
 
 
@@ -53,14 +60,15 @@ fn main() {
         
     });
     psi.fill_bc(&bc);
-    io::write_csv_2d(&"./examples/magnetostatics/psi_initial", psi.clone());
+    
+    println!("Calculating solution:");
+    let mut progress_bar = io::ProgressBar::create(model_conf.n_iter);
+
+    io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", 0, psi.clone(), &progress_bar);
 
     // begin solving
-    println!("Overall progress:");
-    let mut progress_bar = io::ProgressBar::create(model_conf.n_iter);
-    let mut source = psi.clone();
     for _ in 0..model_conf.n_iter{
-        source = get_source(&psi, &model_conf);
+        let source = get_source(&psi, &model_conf);
         let psi_star = solve_poisson(&mut psi, &source, &model_conf, &bc);
         let diff = &psi_star + &(-1.0 * &psi);
         psi = &psi + &(model_conf.relax * diff);
@@ -69,8 +77,7 @@ fn main() {
     }
     progress_bar.finish();
 
-    io::write_csv_2d(&"./examples/magnetostatics/psi_final", psi);
-    io::write_csv_2d(&"./examples/magnetostatics/source", source);
-    println!("Done.");
+    io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", model_conf.n_iter, psi, &progress_bar);
+    println!("{}", "Done.".green().bold());
 
 }

@@ -1,6 +1,6 @@
 
 use super::mesh::cartesian2d::*;
-use super::boundary_conditions::*;
+use super::boundary_conditions::{BCType, BCs, ComponentBCs};
 use super::model::ModelConfig;
 use rnmf::Real;
 

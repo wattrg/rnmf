@@ -28,14 +28,19 @@ pub enum BCType {
     /// so that the value on the boundary is the value supplied by the user
     Dirichlet(Real),
 
-    /// Evenly reflects data near boundary into ghost nodes
+    /// Specifies the gradient at the boundary
     Neumann(Real),
 }
 
+/// Specifies the boundary condition for each component of the data
 pub struct ComponentBCs {
+    /// Specifies the boundary condition for the lower edges
     pub lo: Vec<BCType>,
+
+    /// Specifies the boundary condition for the upper edges
     pub hi: Vec<BCType>,
 }
+
 
 impl ComponentBCs {
     pub fn new(lo: Vec<BCType>, hi: Vec<BCType>) -> ComponentBCs{
@@ -46,6 +51,7 @@ impl ComponentBCs {
     }
 }
 
+/// Specifies the boundary conditions to apply for an entire data structure
 pub struct BCs {
     pub bcs: Vec<ComponentBCs>,
 }

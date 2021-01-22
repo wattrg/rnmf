@@ -1,12 +1,11 @@
-dim = 2
 H_far = {0.0, 1.0}
-length = {1.0, 1.0}
-n_cells = {201, 201}
-relax = 0.1
-n_iter = 100
-n_sub_iter = 2000
-bubble_centre = {0.5, 0.5}
-bubble_radius = 0.05
+length = {11.0, 11.0}
+n_cells = {11, 11}
+relax = 0.4
+n_iter = 10
+n_sub_iter = 50
+bubble_centre = {length[1]/2, length[2]/2}
+bubble_radius = length[1]/20;
 mu = {3.0, 1.0}
 
 

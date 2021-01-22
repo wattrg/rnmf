@@ -18,16 +18,16 @@ pub struct CartesianMesh2D {
     pub node_pos: Vec<Real>,
 
     /// The lower corner of the mesh
-    pub lo: Vec<Real>,
+    pub lo: [Real; 2],
 
     /// The upper corner of the mesh
-    pub hi: Vec<Real>,
+    pub hi: [Real; 2],
 
     /// The number of cells in nodes in each direction
-    pub n : Vec<usize>,
+    pub n : [usize; 2],
 
     /// The distance between each node in each
-    pub dx: Vec<Real>,
+    pub dx: [Real; 2],
 
     pub dim: usize,
     
@@ -48,9 +48,9 @@ trait Indexing{
 impl CartesianMesh2D {
     /// Generate new CartesianMesh from the lo and high corner, 
     /// and the number of nodes
-    pub fn new(lo: Vec<Real>, hi: Vec<Real>, n:Vec<usize>) -> Rc<CartesianMesh2D>
+    pub fn new(lo: [Real; 2], hi: [Real; 2], n: [usize; 2]) -> Rc<CartesianMesh2D>
     {
-        let mut dx = vec![0.0; 2];
+        let mut dx = [0.0; 2];
         for i_dim in 0..2 as usize{
             dx[i_dim] = (hi[i_dim] - lo[i_dim])/(n[i_dim] as Real);
         }
@@ -158,7 +158,7 @@ impl <'a> Iterator for CartesianMeshIter<'a>{
     
     fn next(& mut self) -> Option<Self::Item>{
         // If the next position doesn't exist, return None
-        if self.current_indx >= self.mesh.node_pos.len()/2{
+        if 2*self.current_indx >= self.mesh.node_pos.len(){
             None
         }
         // If the next position exists, return a vector of size 2 containing references
@@ -228,7 +228,7 @@ impl CartesianDataFrame2D {
         {
             n_ghost,
             data:  vec![0.0; n_nodes],
-            n_grown: m.n.clone().into_iter().map(|n| n + 2*n_ghost).collect(),
+            n_grown: m.n.clone().iter().map(|n| n + 2*n_ghost).collect(),
             underlying_mesh: Rc::clone(m),
             n_comp,
             n_nodes,
@@ -248,6 +248,17 @@ impl CartesianDataFrame2D {
     /// Convert the flat index of a data point into the (3+1)D coordinates
     fn get_ij(&self, p: usize) -> Option<(isize, isize, usize)> {
         get_ij_from_p(p, &self.n_grown, self.n_nodes, self.n_ghost)
+    }
+
+    /// returns a flat vector containing only the valid cells
+    pub fn get_valid_cells(&self) -> Vec<Real> {
+        self.data
+            .clone()
+            .into_iter()
+            .enumerate()
+            .filter(|&(p, _)| self.p_is_valid_cell(p))
+            .map(|(_,val)| val)
+            .collect()
     }
 }
 
@@ -666,7 +677,7 @@ mod tests{
         
         // 2D
         {
-            let m2 = CartesianMesh2D::new(vec![0.0, 0.0], vec![6.0, 6.0], vec![3, 3]);
+            let m2 = CartesianMesh2D::new([0.0, 0.0], [6.0, 6.0], [3, 3]);
             let mut df2 = CartesianDataFrame2D::new_from(&m2, 1, 1);
             df2.fill_ic(|x,y,_| x + y);
             
@@ -688,7 +699,7 @@ mod tests{
 
     #[test]
     fn ghost_iterator() {
-        let m2 = CartesianMesh2D::new(vec![0.0, 0.0], vec![10.0, 10.0], vec![5, 5]);
+        let m2 = CartesianMesh2D::new([0.0, 0.0], [10.0, 10.0], [5, 5]);
         let mut df = CartesianDataFrame2D::new_from(&m2, 1, 1);
         let df_iter = df.into_iter().ghost().enumerate_index();
         let mut count = 0;
@@ -701,7 +712,7 @@ mod tests{
     #[test]
     fn mesh_iterator () {
 
-        let m2 = CartesianMesh2D::new(vec![0.0, 0.0], vec![6.0, 6.0], vec![3, 3]);
+        let m2 = CartesianMesh2D::new([0.0, 0.0], [6.0, 6.0], [3, 3]);
         let mut m2_iter = m2.into_iter();
         assert_eq!(m2_iter.next().unwrap(), vec![&mut 1.0, &mut 1.0]);
         assert_eq!(m2_iter.next().unwrap(), vec![&mut 3.0, &mut 1.0]);
@@ -718,7 +729,7 @@ mod tests{
     #[test]
     fn indexing () {
 
-        let m2 = CartesianMesh2D::new(vec![0.0,0.0], vec![6.0,6.0], vec![3,3]);
+        let m2 = CartesianMesh2D::new([0.0,0.0], [6.0,6.0], [3,3]);
         assert_eq!(m2.get_ij(16).unwrap(), (1,2,1));
         assert_eq!(m2.get_ij(40), Option::None);
         assert_eq!(m2.index(2,1,1), &3.0);
@@ -728,7 +739,7 @@ mod tests{
     #[test]
     fn node_pos () {
 
-        let m2 = CartesianMesh2D::new(vec![0.0, 0.0], vec![10.0, 10.0], vec![5,5]);
+        let m2 = CartesianMesh2D::new([0.0, 0.0], [10.0, 10.0], [5,5]);
         assert_eq!(
             m2.node_pos,
             vec![

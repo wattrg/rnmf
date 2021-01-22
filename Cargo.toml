@@ -8,15 +8,16 @@ edition = "2018"
 name="rnmf"
 path="src/lib.rs"
 
-[[bin]]
-name="rnmf_bin"
-path="src/main.rs"
+#[[bin]]
+#name="rnmf_bin"
+#path="src/main.rs"
 
 [features]
-default = ["double_precision"]
-double_precision = []
+disable_double = []
+dumb_terminal = ["colored/no-color"]
 
 [dependencies]
 rlua = "0.17.0"
 indicatif = "0.15.0"
-vtkio = "0.5"
+vtkio = {version="0.6.0", path = "../vtkio"}
+colored = "2.0"
