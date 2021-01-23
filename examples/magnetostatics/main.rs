@@ -6,9 +6,10 @@ use boundary_conditions::*;
 use mesh::cartesian2d::*;
 use std::env;
 use poisson::*;
-use io::{RnmfProgressBar};
+use io::*;
 use colored::*;
 use std::process::Command;
+use std::collections::HashMap;
 
 fn main() {
     let version = env!("CARGO_PKG_VERSION");
@@ -33,6 +34,12 @@ fn main() {
     let model_conf = model::read_lua(&args[1]).unwrap();
 
 
+    //let output: std::collections::HashMap<String, io::OutputCallBack> = 
+    //[("psi", model::get_psi), ("h", model::get_h)].iter().cloned().collect();
+
+    let mut output: HashMap<String, io::OutputCallBack> = HashMap::new();
+    output.insert("psi".to_string(), model::get_psi);
+    output.insert("h".to_string(), model::get_h);
 
     // create the mesh 
     let mesh = CartesianMesh2D::new(
@@ -64,7 +71,7 @@ fn main() {
     println!("Calculating solution:");
     let mut progress_bar = io::ProgressBar::create(model_conf.n_iter);
 
-    io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", 0, psi.clone(), &progress_bar);
+    io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", 0, &psi, &output, &progress_bar);
 
     // begin solving
     for _ in 0..model_conf.n_iter{
@@ -77,7 +84,7 @@ fn main() {
     }
     progress_bar.finish();
 
-    io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", model_conf.n_iter, psi, &progress_bar);
+    io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", model_conf.n_iter, &psi, &output, &progress_bar);
     println!("{}", "Done.".green().bold());
 
 }

@@ -47,7 +47,7 @@ fn is_inside(i: isize, j: isize, dx: &[Real], model: &ModelConfig) -> bool{
     x_dist * x_dist + y_dist * y_dist <= model.bubble_radius*model.bubble_radius
 }
 
-fn mu(i: isize, j: isize, dx: &[Real], model: & ModelConfig) -> Real {
+pub fn mu(i: isize, j: isize, dx: &[Real], model: & ModelConfig) -> Real {
     if is_inside(i, j, dx, model){
         model.mu[0]
     }

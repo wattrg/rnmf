@@ -199,7 +199,7 @@ pub struct CartesianDataFrame2D{
     /// The number of ghost nodes, added to each side of the underlying `CartesianMesh`
     pub n_ghost: usize,
 
-    n_grown: Vec<usize>,
+    pub n_grown: Vec<usize>,
 
     /// Reference to the underlying `CartesianMesh`
     pub underlying_mesh: Rc<CartesianMesh2D>,
@@ -209,7 +209,7 @@ pub struct CartesianDataFrame2D{
     pub n_comp: usize,
 
     /// The total number of individual pieces of information needed to be stored
-    n_nodes: usize,
+    pub n_nodes: usize,
 }
 
 

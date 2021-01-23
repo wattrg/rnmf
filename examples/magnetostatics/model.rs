@@ -1,7 +1,10 @@
 use rlua::{Lua};
 use std::fs;
 use crate::{Real, RealVec2, UIntVec2};
-use std::convert::{TryInto};
+use std::convert::{TryInto, TryFrom};
+use crate::mesh::cartesian2d::*;
+use crate::io::*;
+use crate::poisson::mu;
 
 #[derive(Clone)]
 pub struct ModelConfig {
@@ -97,4 +100,27 @@ pub fn read_lua(lua_loc: &str) -> Result<ModelConfig, std::io::Error>{
         println!();
     });
     Ok(model_conf)
+}
+
+
+pub fn get_psi(data: &CartesianDataFrame2D) -> Result<VtkData, String> {
+    Ok(VtkData::try_from(data.clone())?)
+}
+
+pub fn get_h(data: &CartesianDataFrame2D) -> Result<VtkData, String> {
+    let mut h_field = CartesianDataFrame2D::new_from(&data.underlying_mesh, 2, data.n_ghost);
+    for ((i,j,n), h) in h_field.into_iter().enumerate_index(){
+        match n {
+            0 => {
+                *h = -(data[(i+1,j,0)] - data[(i-1,j,0)])/(2.0*data.underlying_mesh.dx[0]);
+            }
+            1 => {
+                *h = -(data[(i,j+1,0)] - data[(i,j-1,0)])/(2.0*data.underlying_mesh.dx[1]);
+            }
+            _ => {
+                return Err(format!("Component {} out of bounds of data with {} components", n, h_field.n_comp));
+            }
+        }
+    }
+    Ok(VtkData::try_from(h_field)?)
 }
