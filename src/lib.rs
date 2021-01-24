@@ -28,20 +28,70 @@ pub type Real = f64;
 #[cfg(feature="disable_double")]
 pub type Real = f32;
 
-/// Slice containing two real numbers
-pub type RealVec2 = [Real; 2];
 
-/// Slice containing three real numbers
-pub type RealVec3 = [Real; 3];
+#[derive(Debug, Clone)]
+pub struct RealVec1(pub [Real; 1]);
 
-/// Slice containing two unsigned integers
-pub type UIntVec2  = [usize; 2];
+/// Array containing two real numbers
+#[derive(Debug, Clone)]
+pub struct RealVec2(pub [Real; 2]);
+impl std::ops::Index<usize> for RealVec2{
+    type Output = Real;
+    fn index(&self, indx: usize)->&Self::Output{
+        &self.0[indx]
+    }
+}
 
-/// Slice containing three unsigned integers
-pub type UIntVec3  = [usize; 3];
+/// Array containing three real numbers
+#[derive(Debug, Clone)]
+pub struct RealVec3(pub [Real; 3]);
+
+#[derive(Debug, Clone)]
+pub struct UIntVec1(pub [usize; 1]);
+
+/// Array containing two unsigned integers
+#[derive(Debug, Clone)]
+pub struct UIntVec2(pub [usize; 2]);
+impl std::ops::Index<usize> for UIntVec2{
+    type Output = usize;
+    fn index(&self, indx: usize)->&Self::Output{
+        &self.0[indx]
+    }
+}
+
+/// Array containing three unsigned integers
+#[derive(Debug, Clone)]
+pub struct UIntVec3(pub [usize; 3]);
+
+#[derive(Debug, Clone)]
+pub struct IntVec1(pub [isize; 1]);
 
 /// Slice containing two integers
-pub type IntVec2  = [isize; 2];
+#[derive(Debug, Clone)]
+pub struct IntVec2(pub [isize; 2]);
+impl std::ops::Index<usize> for IntVec2{
+    type Output = isize;
+    fn index(&self, indx: usize)->&Self::Output{
+        &self.0[indx]
+    }
+}
 
 /// Slice containing three integers
-pub type IntVec3  = [isize; 3];
+#[derive(Debug, Clone)]
+pub struct IntVec3(pub [isize; 3]);
+
+/// Contains various types of data which can be used
+#[derive(Debug, Clone)]
+pub enum RnmfType{
+    Usize(usize),
+    Isize(isize),
+    Real(Real),
+    RealVec1(RealVec1),
+    RealVec2(RealVec2),
+    RealVec3(RealVec3),
+    UIntVec2(UIntVec2),
+    UIntVec3(UIntVec3),
+    IntVec2(IntVec2),
+    IntVec3(IntVec3),
+}
+

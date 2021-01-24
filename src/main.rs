@@ -10,10 +10,15 @@ fn main()  {
         true => {}
         false => panic!("please provide the lua configuration file")
     }
-    let conf = config::read_lua(&args[1]).unwrap();
+
+    let params = vec![(String::from("x"), RnmfType::IntVec2(IntVec2([0, 0]))), (String::from("y"), RnmfType::RealVec2(RealVec2([0.0, 0.0])))];
+
+    let conf = config::read_lua(&args[1], params).unwrap();
+
+    println!("x = {:?}, y = {:?}", conf.model["x"], conf.model["y"]);
 
     // create the mesh 
-    let u1 = CartesianMesh::new(vec![0.0, 0.0], vec![6.0, 6.0], vec![3, 3], conf.dim);
+    let u1 = CartesianMesh::new(vec![0.0, 0.0], vec![6.0, 6.0], vec![3, 3], conf.geom.dim);
    
     // create some variables on top of the mesh
     let mut variable1 = CartesianDataFrame::new_from(&u1, 2, 1);

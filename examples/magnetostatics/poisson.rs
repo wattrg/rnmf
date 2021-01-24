@@ -1,10 +1,10 @@
 
 use super::mesh::cartesian2d::*;
 use super::boundary_conditions::{BCType, BCs, ComponentBCs};
-use super::model::ModelConfig;
+use super::model::Config;
 use rnmf::Real;
 
-fn get_laplace(phi: &CartesianDataFrame2D, model: &ModelConfig) -> CartesianDataFrame2D {
+fn get_laplace(phi: &CartesianDataFrame2D, model: &Config) -> CartesianDataFrame2D {
     let mut lap = CartesianDataFrame2D::new_from(&phi.underlying_mesh, 1, 1);
     let dx = &phi.underlying_mesh.dx;
     for i in 0..phi.underlying_mesh.n[0] as isize {
@@ -28,38 +28,38 @@ fn get_laplace(phi: &CartesianDataFrame2D, model: &ModelConfig) -> CartesianData
     lap
 }
 
-pub fn get_source(phi: &CartesianDataFrame2D, model: &ModelConfig) -> CartesianDataFrame2D {
+pub fn get_source(phi: &CartesianDataFrame2D, config: &Config) -> CartesianDataFrame2D {
     let mut source = CartesianDataFrame2D::new_from(&phi.underlying_mesh, 1, 1);
     for ((i,j,_), src) in source.into_iter().enumerate_index(){
-        *src = -(1.0 - 1.0/model.relax)/mu(i,j,&phi.underlying_mesh.dx, model);
+        *src = -(1.0 - 1.0/config.model.relax)/mu(i,j,&phi.underlying_mesh.dx, config);
     }
-    &source * &get_laplace(phi, model)
+    &source * &get_laplace(phi, config)
 }
 
 
-fn is_inside(i: isize, j: isize, dx: &[Real], model: &ModelConfig) -> bool{
+fn is_inside(i: isize, j: isize, dx: &[Real], config: &Config) -> bool{
     let x_pos = (i as Real + 0.5) * dx[0];
     let y_pos = (j as Real + 0.5) * dx[1];
 
-    let x_dist = (x_pos - model.bubble_centre[0]).abs();
-    let y_dist = (y_pos - model.bubble_centre[1]).abs();
+    let x_dist = (x_pos - config.model.bubble_centre[0]).abs();
+    let y_dist = (y_pos - config.model.bubble_centre[1]).abs();
 
-    x_dist * x_dist + y_dist * y_dist <= model.bubble_radius*model.bubble_radius
+    x_dist * x_dist + y_dist * y_dist <= config.model.bubble_radius*config.model.bubble_radius
 }
 
-pub fn mu(i: isize, j: isize, dx: &[Real], model: & ModelConfig) -> Real {
-    if is_inside(i, j, dx, model){
-        model.mu[0]
+pub fn mu(i: isize, j: isize, dx: &[Real], config: &Config) -> Real {
+    if is_inside(i, j, dx, config){
+        config.model.mu[0]
     }
     else {
-        model.mu[1]
+        config.model.mu[1]
     }
 }
 
 
 pub fn solve_poisson(psi_init: &CartesianDataFrame2D, 
                      rhs: &CartesianDataFrame2D, 
-                     model: &ModelConfig,
+                     config: &Config,
                      bc: &BCs) -> CartesianDataFrame2D{
 
     let mut psi = psi_init.clone();
@@ -70,7 +70,7 @@ pub fn solve_poisson(psi_init: &CartesianDataFrame2D,
     let gamma = dx2 / (2.0 * (dx2 + dy2));
 
 
-    for _ in 0..model.n_sub_iter {
+    for _ in 0..config.model.n_sub_iter {
         for i in 0..psi.underlying_mesh.n[0] as isize{
             for j in 0..psi.underlying_mesh.n[1] as isize {
                 psi[(i,j,0)] = alpha * rhs[(i,j,0)] + 
