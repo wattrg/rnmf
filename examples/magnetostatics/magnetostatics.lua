@@ -1,5 +1,5 @@
 -- geometry stuff
-
+dim = 2
 length = RealVec2(201.0, 201.0)
 n_cells = UIntVec2(201, 201)
 
@@ -12,6 +12,15 @@ bubble_centre = RealVec2(201.0/2, 201.0/2)
 bubble_radius = 201.0/20;
 mu = RealVec2(3.0, 1.0)
 
+model = Model( 
+    H_far,
+    bubble_centre,
+    mu,
+    n_iter,
+    n_sub_iter,
+    relax,
+    bubble_radius
+)
 
 -- actions
 -- actions = {

@@ -34,28 +34,20 @@ fn main() {
         false => panic!("please provide the lua configuration file")
     }
 
-    let model_params = vec![
-        ("H_far".to_string(), RnmfType::RealVec2(RealVec2([0.0, 0.0]))),
-        ("mu".to_string(), RnmfType::RealVec2(RealVec2([0.0, 0.0]))),
-        ("relax".to_string(), RnmfType::Real(0.0)),
-        ("n_iter".to_string(), RnmfType::Usize(0)),
-        ("s_sub_iter".to_string(), RnmfType::Usize(0)),
-        ("bubble_radius".to_string(), RnmfType::RealVec2(RealVec2([0.0, 0.0]))),
-    ];
 
-    // read lua file
-    let conf = model::read_lua(&args[1]).unwrap();
-    //let conf = model::read_lua(&args[1]).unwrap();
+    let model_instance = model::UserModel::new();
+    let conf = config::read_lua(&args[1], model_instance).unwrap();
 
 
-    // set up hash map for printing variables
+
+    // set up hash map for outputting variables
     let mut output: HashMap<String, io::OutputCallBack> = HashMap::new();
     output.insert("psi".to_string(), model::get_psi);
     output.insert("h".to_string(), model::get_h);
 
     // create the mesh 
     let mesh = CartesianMesh2D::new(
-        [0.0, 0.0],                                     // lo corner
+        [0.0, 0.0],                                   // lo corner
         [conf.geom.length[0], conf.geom.length[1]],   // hi corner
         [conf.geom.n_cells[0], conf.geom.n_cells[1]]  // number of cells
     );

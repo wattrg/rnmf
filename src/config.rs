@@ -1,10 +1,12 @@
-use rlua::{Lua, UserData};
+use rlua::{Lua, UserData, Context};
 use std::fs;
 use crate::*;
 use crate::mesh::cartesian2d::CartesianDataFrame2D;
 use colored::*;
 
-pub trait UserConfig {}
+pub trait UserConfig: UserData + Clone {
+    fn lua_constructor(self, lua_ctx: Context)->rlua::Function;
+}
 
 pub struct Actions<T: UserConfig>{
     pub actions: Vec<Action<T>>
@@ -66,9 +68,6 @@ impl GeomConfig{
     }
 }
 
-impl UserData for &RnmfType {}
-impl UserData for RnmfType {}
-impl UserData for &mut &RnmfType  {}
 impl UserData for RealVec2 {}
 impl UserData for UIntVec2 {}
 impl UserData for IntVec2 {}
@@ -77,11 +76,11 @@ impl UserData for UIntVec3 {}
 impl UserData for IntVec3 {}
 
 /// function which executes a lua file (located at lua_loc), and returns the configuration
-pub fn read_lua<T>(lua_loc: &str, user_model: T) -> Result<Config<T>, std::io::Error>
+pub fn read_lua<T: 'static>(lua_loc: &str, user_model: T) -> Result<Config<T>, std::io::Error>
     where 
         T: UserConfig,
 {
-    let mut conf = Config::new(user_model);
+    let mut conf = Config::new(user_model.clone());
 
     // load the contents of the file
     let lua_file = fs::read_to_string(lua_loc).expect("Could not read lua file");
@@ -96,16 +95,22 @@ pub fn read_lua<T>(lua_loc: &str, user_model: T) -> Result<Config<T>, std::io::E
         let globals = lua_ctx.globals();
 
         // create constructors for data types
-        let realvec2_constructor = lua_ctx.create_function(|_,(x,y): (Real, Real)| Ok(RealVec2([x, y])))
-                                          .expect("Failed creating 'RealVec2' object from lua");
-        let uintvec2_constructor = lua_ctx.create_function(|_,(x,y): (usize, usize)| Ok(UIntVec2([x, y])))
-                                          .expect("Failed creating 'UIntVec' object from lua");
-        let intvec2_constructor = lua_ctx.create_function(|_,(x,y): (isize, isize)| Ok(IntVec2([x, y])))
-                                          .expect("Failed creating 'UIntVec' object from lua");
+        let realvec2_constructor = lua_ctx.create_function(|_,(x,y): (Real, Real)| 
+            Ok(RealVec2([x, y]))
+        ).expect("Failed creating 'RealVec2' constructor for lua");
+        let uintvec2_constructor = lua_ctx.create_function(|_,(x,y): (usize, usize)| 
+            Ok(UIntVec2([x, y]))
+        ).expect("Failed creating 'UIntVec' constructor for lua");
+        let intvec2_constructor = lua_ctx.create_function(|_,(x,y): (isize, isize)| 
+            Ok(IntVec2([x, y]))
+        ).expect("Failed creating 'UIntVec' constructor for lua");
+
+        let user_model_constructor = user_model.lua_constructor(lua_ctx);
 
         globals.set("RealVec2", realvec2_constructor).unwrap();
         globals.set("UIntVec2", uintvec2_constructor).unwrap();
         globals.set("IntVec2", intvec2_constructor).unwrap();
+        globals.set("Model", user_model_constructor).unwrap();
 
 
 
@@ -129,6 +134,8 @@ pub fn read_lua<T>(lua_loc: &str, user_model: T) -> Result<Config<T>, std::io::E
                 println!("{} {} not yet supported. Exiting", "Error:".red().bold(), conf.geom.dim);
             }
         }
+
+        conf.model = globals.get::<_,T>("model").expect("failed reading model parameters");
 
     });
     Ok(conf)

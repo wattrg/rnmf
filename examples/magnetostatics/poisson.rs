@@ -1,10 +1,11 @@
 
 use super::mesh::cartesian2d::*;
 use super::boundary_conditions::{BCType, BCs, ComponentBCs};
-use super::model::Config;
+use crate::config::Config;
+use super::model::UserModel;
 use rnmf::Real;
 
-fn get_laplace(phi: &CartesianDataFrame2D, model: &Config) -> CartesianDataFrame2D {
+fn get_laplace(phi: &CartesianDataFrame2D, model: &Config<UserModel>) -> CartesianDataFrame2D {
     let mut lap = CartesianDataFrame2D::new_from(&phi.underlying_mesh, 1, 1);
     let dx = &phi.underlying_mesh.dx;
     for i in 0..phi.underlying_mesh.n[0] as isize {
@@ -28,7 +29,7 @@ fn get_laplace(phi: &CartesianDataFrame2D, model: &Config) -> CartesianDataFrame
     lap
 }
 
-pub fn get_source(phi: &CartesianDataFrame2D, config: &Config) -> CartesianDataFrame2D {
+pub fn get_source(phi: &CartesianDataFrame2D, config: &Config<UserModel>) -> CartesianDataFrame2D {
     let mut source = CartesianDataFrame2D::new_from(&phi.underlying_mesh, 1, 1);
     for ((i,j,_), src) in source.into_iter().enumerate_index(){
         *src = -(1.0 - 1.0/config.model.relax)/mu(i,j,&phi.underlying_mesh.dx, config);
@@ -37,7 +38,7 @@ pub fn get_source(phi: &CartesianDataFrame2D, config: &Config) -> CartesianDataF
 }
 
 
-fn is_inside(i: isize, j: isize, dx: &[Real], config: &Config) -> bool{
+fn is_inside(i: isize, j: isize, dx: &[Real], config: &Config<UserModel>) -> bool{
     let x_pos = (i as Real + 0.5) * dx[0];
     let y_pos = (j as Real + 0.5) * dx[1];
 
@@ -47,7 +48,7 @@ fn is_inside(i: isize, j: isize, dx: &[Real], config: &Config) -> bool{
     x_dist * x_dist + y_dist * y_dist <= config.model.bubble_radius*config.model.bubble_radius
 }
 
-pub fn mu(i: isize, j: isize, dx: &[Real], config: &Config) -> Real {
+pub fn mu(i: isize, j: isize, dx: &[Real], config: &Config<UserModel>) -> Real {
     if is_inside(i, j, dx, config){
         config.model.mu[0]
     }
@@ -59,7 +60,7 @@ pub fn mu(i: isize, j: isize, dx: &[Real], config: &Config) -> Real {
 
 pub fn solve_poisson(psi_init: &CartesianDataFrame2D, 
                      rhs: &CartesianDataFrame2D, 
-                     config: &Config,
+                     config: &Config<UserModel>,
                      bc: &BCs) -> CartesianDataFrame2D{
 
     let mut psi = psi_init.clone();

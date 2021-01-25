@@ -80,18 +80,5 @@ impl std::ops::Index<usize> for IntVec2{
 #[derive(Debug, Clone)]
 pub struct IntVec3(pub [isize; 3]);
 
-/// Contains various types of data which can be used
-#[derive(Debug, Clone)]
-pub enum RnmfType{
-    Usize(usize),
-    Isize(isize),
-    Real(Real),
-    RealVec1(RealVec1),
-    RealVec2(RealVec2),
-    RealVec3(RealVec3),
-    UIntVec2(UIntVec2),
-    UIntVec3(UIntVec3),
-    IntVec2(IntVec2),
-    IntVec3(IntVec3),
-}
+
 
