@@ -137,6 +137,15 @@ pub fn read_lua(lua_loc: &str, model_params: Vec<(String, RnmfType)>) -> Result<
                 RnmfType::UIntVec2(_) => {
                     conf.model.insert(param_name.clone(), RnmfType::UIntVec2(globals.get::<_,UIntVec2>(param_name.clone()).expect("Failed retrieving a model parameter")));
                 }
+                RnmfType::Real(_) => {
+                    conf.model.insert(param_name.clone(), RnmfType::Real(globals.get::<_,Real>(param_name.clone()).expect("Failed retrieving a model parameter")));
+                }
+                RnmfType::Usize(_) => {
+                    conf.model.insert(param_name.clone(), RnmfType::Usize(globals.get::<_,usize>(param_name.clone()).expect("Failed retrieving a model parameter")));
+                }
+                RnmfType::Isize(_) => {
+                    conf.model.insert(param_name.clone(), RnmfType::Isize(globals.get::<_,isize>(param_name.clone()).expect("Failed retrieving a model parameter")));
+                }
                 _ => {
                     panic!("type not supported to be read from lua yet");
                 }

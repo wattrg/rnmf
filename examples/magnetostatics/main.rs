@@ -34,8 +34,18 @@ fn main() {
         false => panic!("please provide the lua configuration file")
     }
 
+    let model_params = vec![
+        ("H_far".to_string(), RnmfType::RealVec2(RealVec2([0.0, 0.0]))),
+        ("mu".to_string(), RnmfType::RealVec2(RealVec2([0.0, 0.0]))),
+        ("relax".to_string(), RnmfType::Real(0.0)),
+        ("n_iter".to_string(), RnmfType::Usize(0)),
+        ("s_sub_iter".to_string(), RnmfType::Usize(0)),
+        ("bubble_radius".to_string(), RnmfType::RealVec2(RealVec2([0.0, 0.0]))),
+    ];
+
     // read lua file
-    let conf = model::read_lua(&args[1]).unwrap();
+    let conf = config::read_lua(&args[1], model_params).unwrap();
+    //let conf = model::read_lua(&args[1]).unwrap();
 
 
     // set up hash map for printing variables
@@ -54,39 +64,39 @@ fn main() {
     let bc = BCs::new(vec![
         ComponentBCs::new(
             // lo bc
-            vec![BCType::Neumann(-conf.model.h_far[0]/mesh.dx[0]), 
-                 BCType::Neumann(-conf.model.h_far[1]/mesh.dx[1])], 
+            vec![BCType::Neumann(-conf.model["h_far"][0]/mesh.dx[0]), 
+                 BCType::Neumann(-conf.model["h_far"][1]/mesh.dx[1])], 
             // hi bc
-            vec![BCType::Neumann(-conf.model.h_far[0]/mesh.dx[0]), 
-                 BCType::Neumann(-conf.model.h_far[1]/mesh.dx[1])]  
+            vec![BCType::Neumann(-conf.model["h_far"][0]/mesh.dx[0]), 
+                 BCType::Neumann(-conf.model["h_far"][1]/mesh.dx[1])]  
         )
     ]);
 
     // create the data frame
     let mut psi = CartesianDataFrame2D::new_from(&mesh, 1, 1);
     psi.fill_ic(|x,y,_| -> Real {
-        -conf.model.h_far[0]/mesh.dx[0]*x - conf.model.h_far[1]/mesh.dx[1]*y
+        -conf.model["h_far"][0]/mesh.dx[0]*x - conf.model["h_far"][1]/mesh.dx[1]*y
         
     });
     psi.fill_bc(&bc);
     
     println!("Calculating solution:");
-    let mut progress_bar = io::ProgressBar::create(conf.model.n_iter);
+    let mut progress_bar = io::ProgressBar::create(conf.model["n_iter"]);
 
     io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", 0, &psi, &output, &progress_bar);
 
     // begin solving
-    for _ in 0..conf.model.n_iter{
+    for _ in 0..conf.model["n_iter"]{
         let source = get_source(&psi, &conf);
         let psi_star = solve_poisson(&mut psi, &source, &conf, &bc);
         let diff = &psi_star + &(-1.0 * &psi);
-        psi = &psi + &(conf.model.relax * diff);
+        psi = &psi + &(conf.model["relax"] * diff);
         psi.fill_bc(&bc);
         progress_bar.increment(1);
     }
     progress_bar.finish();
 
-    io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", conf.model.n_iter, &psi, &output, &progress_bar);
+    io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", conf.model["n_iter"], &psi, &output, &progress_bar);
     println!("{}", "Done.".green().bold());
 
 }
