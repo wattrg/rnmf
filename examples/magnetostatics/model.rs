@@ -4,7 +4,7 @@ use crate::{Real, RealVec2, UIntVec2, IntVec2};
 use std::convert::{TryFrom};
 use crate::mesh::cartesian2d::*;
 use crate::io::*;
-use crate::config::*;
+//use crate::config::*;
 
 
 pub struct ModelConfig {
@@ -27,7 +27,7 @@ pub struct GeomConfig {
 pub struct Config {
     pub geom: GeomConfig,
     pub model: ModelConfig,
-    pub actions: Option<Actions>,
+    //pub actions: Option<Actions<f64>>,
 }
 
 
@@ -120,7 +120,7 @@ pub fn read_lua(lua_loc: &str) -> Result<Config, std::io::Error>{
     Ok(Config{
         model: model_conf,
         geom: geom_conf,
-        actions: Option::None,
+        //actions: Option::None,
     })
 }
 
