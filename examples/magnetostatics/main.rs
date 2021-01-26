@@ -8,42 +8,16 @@ use std::env;
 use poisson::*;
 use io::*;
 use colored::*;
-use std::process::Command;
-use std::collections::HashMap;
 
 fn main() {
-    let version = env!("CARGO_PKG_VERSION");
-    let commit = &String::from_utf8(
-        Command::new("git").args(&["rev-parse", "HEAD"])
-                           .output()
-                           .unwrap()
-                           .stdout).unwrap()[0..6];
-
-    println!("{}", format!("rnmf-{}: version {}", commit, version).green().bold());
-    println!("Hello from the magnetistatics example!");
-
-
-    if !cfg!(feature = "disable_double") {
-        println!("using double precision");
-    }
-
     // read command line argument
     let args: Vec<String> = env::args().collect();
-    match args.len() > 1 {
-        true => {}
-        false => panic!("please provide the lua configuration file")
-    }
 
-
+    // generate instance of the user model
     let model_instance = model::UserModel::new();
-    let conf = config::read_lua(&args[1], model_instance).unwrap();
 
-
-
-    // set up hash map for outputting variables
-    let mut output: HashMap<String, io::OutputCallBack> = HashMap::new();
-    output.insert("psi".to_string(), model::get_psi);
-    output.insert("h".to_string(), model::get_h);
+    // configure the simulation
+    let (conf, out_cb) = config::init(args, model_instance, model::output_callbacks).unwrap();
 
     // create the mesh 
     let mesh = CartesianMesh2D::new(
@@ -53,6 +27,7 @@ fn main() {
     );
 
 
+    // create the boundary conditions
     let bc = BCs::new(vec![
         ComponentBCs::new(
             // lo bc
@@ -75,7 +50,7 @@ fn main() {
     println!("Calculating solution:");
     let mut progress_bar = io::ProgressBar::create(conf.model.n_iter);
 
-    io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", 0, &psi, &output, &progress_bar);
+    io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", 0, &psi, &out_cb, &progress_bar);
 
     // begin solving
     for _ in 0..conf.model.n_iter{
@@ -88,7 +63,7 @@ fn main() {
     }
     progress_bar.finish();
 
-    io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", conf.model.n_iter, &psi, &output, &progress_bar);
+    io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", conf.model.n_iter, &psi, &out_cb, &progress_bar);
     println!("{}", "Done.".green().bold());
 
 }

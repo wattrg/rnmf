@@ -3,6 +3,8 @@ use std::fs;
 use crate::*;
 use crate::mesh::cartesian2d::CartesianDataFrame2D;
 use colored::*;
+use std::process::Command;
+use std::collections::HashMap;
 
 pub trait UserConfig: UserData + Clone {
     fn lua_constructor(self, lua_ctx: Context)->rlua::Function;
@@ -74,6 +76,37 @@ impl UserData for IntVec2 {}
 impl UserData for RealVec3 {}
 impl UserData for UIntVec3 {}
 impl UserData for IntVec3 {}
+
+pub fn init<T: 'static>(args: Vec<String>, user_model: T, out_cb:fn()->HashMap<String, crate::io::OutputCallBack>)
+    ->Result<(Config<T>, HashMap<String,crate::io::OutputCallBack>), std::io::Error>
+    where 
+        T: UserConfig    
+{
+    let version = env!("CARGO_PKG_VERSION");
+    let commit = &String::from_utf8(
+        Command::new("git").args(&["rev-parse", "HEAD"])
+                           .output()
+                           .unwrap()
+                           .stdout).unwrap()[0..7];
+
+    println!("{}", format!("rnmf-{}: version {}", commit, version).green().bold());
+    if cfg!(feature = "disable_double") {
+        println!("using single precision");
+    }
+    else{
+        println!("using double precision");
+    }
+    println!("Hello from the magnetistatics example!");
+
+    if args.len() < 1 {
+        println!("{} Location of lua configuration script not given.", "Error:".red());
+        panic!();
+    }
+
+    Ok((read_lua(&args[1], user_model)?, out_cb()))
+
+
+}
 
 /// function which executes a lua file (located at lua_loc), and returns the configuration
 pub fn read_lua<T: 'static>(lua_loc: &str, user_model: T) -> Result<Config<T>, std::io::Error>

@@ -4,6 +4,7 @@ use std::convert::{TryFrom};
 use crate::mesh::cartesian2d::{CartesianDataFrame2D,IndexEnumerable};
 use crate::config::UserConfig;
 use crate::io::{VtkData};
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct UserModel{
@@ -43,6 +44,14 @@ impl UserConfig for UserModel{
                 bubble_radius,
             })).expect("failed creating user model lua constructor")
     }
+}
+
+pub fn output_callbacks()->HashMap<String, crate::io::OutputCallBack>{
+    // set up hash map for outputting variables
+    let mut output: HashMap<String, crate::io::OutputCallBack> = HashMap::new();
+    output.insert("psi".to_string(), get_psi);
+    output.insert("h".to_string(), get_h);
+    output
 }
 
 pub fn get_psi(data: &CartesianDataFrame2D) -> Result<VtkData, String> {
