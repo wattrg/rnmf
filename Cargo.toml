@@ -18,6 +18,7 @@ dumb_terminal = ["colored/no-color"]
 
 [dependencies]
 rlua = "0.17.0"
+#derive = {version="0.1.0", path = "./derive"}
 indicatif = "0.15.0"
 vtkio = {version="0.6.0", path = "../vtkio"}
 colored = "2.0"
