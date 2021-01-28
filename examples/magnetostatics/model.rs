@@ -29,6 +29,7 @@ impl UserConfig for UserModel{
             n_sub_iter: 0,
             relax: 0.0,
             bubble_radius: 0.0,
+            tol: 0.4,
         }
     }
 
