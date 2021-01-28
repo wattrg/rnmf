@@ -7,6 +7,7 @@ use std::process::Command;
 use std::collections::HashMap;
 
 pub trait UserConfig: UserData + Clone {
+    fn new()->Self;
     fn lua_constructor(self, lua_ctx: Context)->rlua::Function;
 }
 
@@ -21,6 +22,7 @@ impl <T: UserConfig> Actions<T>{
     }
 }
 
+#[derive(Clone)]
 pub struct Action<T: UserConfig>{
     pub name: String,
     pub pre_action: Option<fn(&Config<T>)>,
@@ -28,6 +30,9 @@ pub struct Action<T: UserConfig>{
     pub iters: usize,
     pub stop: Option<f64>,
 }
+impl <T: UserConfig> UserData for Action<T>{}
+
+
 impl <T: UserConfig> Action<T>{
     pub fn new()->Action<T>{
         Action{

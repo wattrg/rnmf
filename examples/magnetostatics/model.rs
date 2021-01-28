@@ -15,9 +15,12 @@ pub struct UserModel{
     pub bubble_centre: RealVec2,
     pub bubble_radius: Real,
     pub mu: RealVec2,
+    pub tol: Real,
 }
-impl UserModel{
-    pub fn new()->Self{
+impl UserData for UserModel {}
+
+impl UserConfig for UserModel{
+    fn new()->Self{
         Self{
             h_far: RealVec2([0.0, 0.0]),
             bubble_centre: RealVec2([0.0, 0.0]),
@@ -28,21 +31,28 @@ impl UserModel{
             bubble_radius: 0.0,
         }
     }
-}
-impl UserData for UserModel {}
 
-impl UserConfig for UserModel{
     fn lua_constructor(self, lua_ctx: Context)->rlua::Function{
-        lua_ctx.create_function(|_,(h_far,bubble_centre,mu,n_iter,n_sub_iter,relax,bubble_radius): (RealVec2,RealVec2,RealVec2,usize,usize,Real,Real)|
+        lua_ctx.create_function(|_,model: rlua::Table|
             Ok(UserModel{
-                h_far,
-                bubble_centre,
-                mu,
-                n_iter,
-                n_sub_iter,
-                relax,
-                bubble_radius,
-            })).expect("failed creating user model lua constructor")
+                h_far: model.get::<_,RealVec2>("H_far")
+                            .expect("failed reading 'H_far'"),
+                bubble_centre: model.get::<_,RealVec2>("bubble_centre")
+                                    .expect("failed reading 'bubble centre'"),
+                mu: model.get::<_,RealVec2>("mu")
+                         .expect("failed reading 'mu'"),
+                n_iter: model.get::<_,usize>("n_iter")
+                             .expect("failed reading 'n_iter'"),
+                n_sub_iter: model.get::<_,usize>("n_sub_iter")
+                                 .expect("failed reading 'n_sub_iter'"),
+                relax: model.get::<_,Real>("relax")
+                            .expect("failed reading 'relax'"),
+                bubble_radius: model.get::<_,Real>("bubble_radius")
+                                    .expect("failed reading 'bubble_radius'"),
+                tol: model.get::<_,Real>("tolerance")
+                          .expect("failed reading 'tol'")
+            })
+        ).expect("failed creating user model lua ")
     }
 }
 
