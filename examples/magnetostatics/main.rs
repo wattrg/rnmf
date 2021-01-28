@@ -8,6 +8,7 @@ use std::env;
 use poisson::*;
 use io::*;
 use colored::*;
+use crate::config::{UserConfig};
 
 fn main() {
     // read command line argument
@@ -53,17 +54,22 @@ fn main() {
     io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", 0, &psi, &out_cb, &progress_bar);
 
     // begin solving
-    for _ in 0..conf.model.n_iter{
+    let mut sum_diff: Real = 1.0;
+    let mut iter = 0;
+    while iter < conf.model.n_iter && (sum_diff > 1e-5){
         let source = get_source(&psi, &conf);
         let psi_star = solve_poisson(&mut psi, &source, &conf, &bc);
         let diff = &psi_star + &(-1.0 * &psi);
+        sum_diff = sum(&diff);
         psi = &psi + &(conf.model.relax * diff);
         psi.fill_bc(&bc);
         progress_bar.increment(1);
+        iter += 1;
     }
     progress_bar.finish();
 
     io::write_vtk(&"./examples/magnetostatics/", &"ferro_droplet", conf.model.n_iter, &psi, &out_cb, &progress_bar);
+    println!("sum diff = {}", sum_diff);
     println!("{}", "Done.".green().bold());
 
 }

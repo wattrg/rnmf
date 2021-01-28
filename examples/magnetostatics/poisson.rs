@@ -70,7 +70,6 @@ pub fn solve_poisson(psi_init: &CartesianDataFrame2D,
     let beta = dy2 / (2.0 * (dx2 + dy2));
     let gamma = dx2 / (2.0 * (dx2 + dy2));
 
-
     for _ in 0..config.model.n_sub_iter {
         for i in 0..psi.underlying_mesh.n[0] as isize{
             for j in 0..psi.underlying_mesh.n[1] as isize {
@@ -83,5 +82,15 @@ pub fn solve_poisson(psi_init: &CartesianDataFrame2D,
     }
     psi
 
+}
+
+pub fn sum(psi: &CartesianDataFrame2D)->Real{
+    let mut psi_sum: Real = 0.0;
+    for i in 0..psi.underlying_mesh.n[0] as isize{
+        for j in 0..psi.underlying_mesh.n[1] as isize {
+            psi_sum += psi[(i,j,0)].abs();
+        }
+    }
+    psi_sum
 }
 
