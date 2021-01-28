@@ -50,7 +50,7 @@ impl UserConfig for UserModel{
                             .expect("failed reading 'relax'"),
                 bubble_radius: model.get::<_,Real>("bubble_radius")
                                     .expect("failed reading 'bubble_radius'"),
-                tol: model.get::<_,Real>("tolerance")
+                tol: model.get::<_,Real>("tol")
                           .expect("failed reading 'tol'")
             })
         ).expect("failed creating user model lua ")
