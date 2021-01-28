@@ -11,7 +11,8 @@ model = Model({
     n_iter = 1000,
     n_sub_iter = 550,
     relax = 0.2,
-    bubble_radius = 301.0/20
+    bubble_radius = 301.0/20,
+    tol = 1e-5
 })
 
 -- actions

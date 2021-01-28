@@ -56,7 +56,7 @@ fn main() {
     // begin solving
     let mut sum_diff: Real = 1.0;
     let mut iter = 0;
-    while iter < conf.model.n_iter && (sum_diff > 1e-5){
+    while iter < conf.model.n_iter && (sum_diff > conf.model.tol){
         let source = get_source(&psi, &conf);
         let psi_star = solve_poisson(&mut psi, &source, &conf, &bc);
         let diff = &psi_star + &(-1.0 * &psi);

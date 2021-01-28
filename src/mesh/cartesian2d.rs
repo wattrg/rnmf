@@ -447,6 +447,13 @@ impl <'a> IntoIterator for &'a mut CartesianDataFrame2D{
     }
 }
 
+// impl <'a> std::IntoIter for &'a CartesianDataFrame2D{
+//     type Item = &'a Real;
+//     type IntoIter = CartesianDataFrameIter<'a>;
+
+
+// }
+
 /// Struct to iterate over a data frame, with the current index and the data itself
 pub struct EnumerateIndex<'a>{
     iter: CartesianDataFrameIter<'a>,
