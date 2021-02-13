@@ -29,6 +29,7 @@ pub struct CartesianMesh2D {
     /// The distance between each node in each
     pub dx: [Real; 2],
 
+    /// The number of dimensions
     pub dim: usize,
     
     /// The number of nodes in the mesh
@@ -435,17 +436,46 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D{
     }
 }
 
-
-
-/// mutable iterator for `CartesianDataFrame`.
-pub struct CartesianDataFrameIter<'a> {
-    df: &'a mut CartesianDataFrame2D,
+/// Immutable iterator for `CartesianDataFrame`.
+pub struct CartesianDataFrame2DIter<'a> {
+    df: &'a CartesianDataFrame2D,
     current_indx: usize,
+}
+impl <'a> Iterator for CartesianDataFrame2DIter<'a>{
+    type Item = &'a Real;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // progress the current index to skip ghost cells
+        while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
+                                  // !self.df.p_is_valid_cell(self.current_indx) {
+                                  !(self.df.cell_type[self.current_indx] == CellType::Valid) {
+            self.current_indx += 1;
+        }
+
+        // check if the next item exists
+        if self.current_indx <= self.df.n_nodes - self.df.n_comp
+                   //&& self.df.p_is_valid_cell(self.current_indx){
+                    && self.df.cell_type[self.current_indx] == CellType::Valid {
+
+            // access and return next item
+            let next_data = Some(&self.df.data[self.current_indx]);
+            self.current_indx += 1;
+            next_data
+        }
+        else{
+            // the next item doesn't exist, so return None
+            None
+        }
+    }
 }
 
 
-
-impl <'a> Iterator for CartesianDataFrameIter<'a> {
+/// Mutable iterator for `CartesianDataFrame`.
+pub struct CartesianDataFrame2DIterMut<'a> {
+    df: &'a mut CartesianDataFrame2D,
+    current_indx: usize,
+}
+impl <'a> Iterator for CartesianDataFrame2DIterMut<'a> {
     type Item = &'a mut Real;
 
     // this is a safe function wrapping unsafe code. Rust cannot guarantee that it is safe, but
@@ -479,30 +509,10 @@ impl <'a> Iterator for CartesianDataFrameIter<'a> {
     }
 }
 
-// impl <'a> Iterator for &'a CartesianDataFrameIter<'a>{
-//     type Item = &'a Real;
-
-//     fn next(self) -> Option<Self::Item>{
-//         while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
-//                                    !self.df.p_is_valid_cell(self.current_indx){
-//             self.current_indx += 1;
-//         }
-
-//         let next_data: Option::<Self::Item>;
-//         if self.current_indx <= self.df.n_nodes - self.df.n_comp && self.df.p_is_valid_cell(self.current_indx){
-//             next_data = Some(&self.df.data[self.current_indx]);
-//             self.current_indx += 1;
-//             next_data
-//         }
-//         else{
-//             None
-//         }
-//     }
-// }
 
 impl <'a> IntoIterator for &'a mut CartesianDataFrame2D{
     type Item = &'a mut Real;
-    type IntoIter = CartesianDataFrameIter<'a>;
+    type IntoIter = CartesianDataFrame2DIterMut<'a>;
 
     fn into_iter(self) -> Self::IntoIter{
         Self::IntoIter {
@@ -512,29 +522,29 @@ impl <'a> IntoIterator for &'a mut CartesianDataFrame2D{
     }
 }
 
-// impl <'a> IntoIterator for &'a CartesianDataFrame2D{
-//     type Item = &'a Real;
-//     type IntoIter = CartesianDataFrameIter<'a>;
+impl<'a> IntoIterator for &'a CartesianDataFrame2D{
+    type Item = &'a Real;
+    type IntoIter = CartesianDataFrame2DIter<'a>;
 
-//     fn into_iter(self) -> Self::IntoIter{
-//         Self::IntoIter{
-//             current_indx: 0,
-//             df: self,
-//         }
-//     }
-// }
-
-/// Struct to iterate over a data frame, with the current index and the data itself
-pub struct EnumerateIndex<'a>{
-    iter: CartesianDataFrameIter<'a>,
+    fn into_iter(self) -> Self::IntoIter{
+        Self::IntoIter{
+            current_indx: 0,
+            df: self,
+        }
+    }
 }
 
-/// Turns `CartesianDataFrameIter` into an iterator which enumerates over the current index
+
+/// Struct to mutably iterate over a data frame, with the current index and the data itself
+pub struct EnumerateIndex<'a>{
+    iter: CartesianDataFrame2DIterMut<'a>,
+}
+
+/// Turns `CartesianDataFrameIter` into a mutable iterator which enumerates over the current index
 pub trait IndexEnumerable <'a> {
     fn enumerate_index(self) -> EnumerateIndex<'a>;
 }
-
-impl <'a> IndexEnumerable <'a> for CartesianDataFrameIter<'a> {
+impl <'a> IndexEnumerable <'a> for CartesianDataFrame2DIterMut<'a> {
     fn enumerate_index(self) -> EnumerateIndex<'a> {
         EnumerateIndex{
             iter: self,
@@ -559,17 +569,16 @@ impl <'a> Iterator for EnumerateIndex<'a> {
     }
 }
 
-/// Structure to iterate over data, giving both the position of the data, and the data itself
+/// Structure to mutably iterate over data, giving both the position of the data, and the data itself
 pub struct EnumeratePos<'a>{
-    iter: CartesianDataFrameIter<'a>,
+    iter: CartesianDataFrame2DIterMut<'a>,
 }
 
-/// Turns `CartesianDataFrameIter` into an iterator which enumerates the position of the data
+/// Turns `CartesianDataFrameIter` into a mutable iterator which enumerates the position of the data
 pub trait PosEnumerable <'a> {
     fn enumerate_pos(self) -> EnumeratePos<'a>;
 }
-
-impl <'a> PosEnumerable <'a> for CartesianDataFrameIter<'a> {
+impl <'a> PosEnumerable <'a> for CartesianDataFrame2DIterMut<'a> {
     fn enumerate_pos(self) -> EnumeratePos<'a> {
         EnumeratePos{
             iter: self,
@@ -598,6 +607,7 @@ impl <'a> Iterator for EnumeratePos<'a> {
     }
 }
 
+// multiplication of owned data frame by a real number
 impl std::ops::Mul<CartesianDataFrame2D> for Real {
     type Output = CartesianDataFrame2D;
 
@@ -609,6 +619,9 @@ impl std::ops::Mul<CartesianDataFrame2D> for Real {
         result
     }
 }
+
+/// multiplication of borrowed data frame by real
+/// returns a new owned data frame
 impl std::ops::Mul<&CartesianDataFrame2D> for Real {
     type Output = CartesianDataFrame2D;
 
@@ -621,6 +634,8 @@ impl std::ops::Mul<&CartesianDataFrame2D> for Real {
     }
 }
 
+/// addition of two borrowed data frames
+/// returns a new owned data frame
 impl std::ops::Add<&CartesianDataFrame2D> for &CartesianDataFrame2D {
     type Output = CartesianDataFrame2D;
 
@@ -633,6 +648,8 @@ impl std::ops::Add<&CartesianDataFrame2D> for &CartesianDataFrame2D {
     }
 }
 
+/// multiplication of two borrowed data frames
+/// returns a new owned data frame
 impl std::ops::Mul<&CartesianDataFrame2D> for &CartesianDataFrame2D {
     type Output = CartesianDataFrame2D;
 
@@ -695,7 +712,7 @@ pub trait GhostIterator <'a> {
     fn ghost(self) -> CartesianDataFrameGhostIter<'a>;
 }
 
-impl <'a> GhostIterator <'a> for CartesianDataFrameIter<'a> {
+impl <'a> GhostIterator <'a> for CartesianDataFrame2DIterMut<'a> {
     fn ghost(self) -> CartesianDataFrameGhostIter<'a> {
         CartesianDataFrameGhostIter{
             current_indx: 0,
