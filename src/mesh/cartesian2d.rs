@@ -190,6 +190,19 @@ impl <'a> IntoIterator for &'a CartesianMesh2D {
 
 
 // ********************************* Cartesian data frame ****************************************
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum CellType{
+    Valid,
+    North,
+    South,
+    East,
+    West,
+    NorthEast,
+    SouthEast,
+    NorthWest,
+    SouthWest,
+}
+
 /// Structure to store data defined on a `CartesianMesh`
 #[derive(Debug, Clone)]
 pub struct CartesianDataFrame2D{
@@ -210,6 +223,9 @@ pub struct CartesianDataFrame2D{
 
     /// The total number of individual pieces of information needed to be stored
     pub n_nodes: usize,
+
+    /// Distinguish between valid and ghost cells
+    cell_type: Vec<CellType>,
 }
 
 
@@ -222,16 +238,41 @@ impl CartesianDataFrame2D {
     {
         let n_nodes = ((m.n[0] + 2*n_ghost) * (m.n[1] + 2*n_ghost))*n_comp;
 
+        // calculate grown size of the data frame
+        let n_grown: Vec<usize> = m.n.clone().iter().map(|n| n + 2*n_ghost).collect();
 
+        // calculate cell_type
+        let mut cell_type = vec![CellType::Valid; n_nodes];
+        for (p,cell) in cell_type.iter_mut().enumerate(){
+            // get the index in index space
+            let (i,j,_) = get_ij_from_p(p, &n_grown, n_nodes, n_ghost).unwrap();
+
+            // check if the cell is a ghost cell, and fill in the appropriate type of ghost cell if
+            // it is
+            if j < 0 { *cell = CellType::South; }
+            else if j >= m.n[1] as isize { *cell = CellType::North; }
+
+            if i < 0 {
+                if j < 0 { *cell = CellType::SouthEast; }
+                else if j >= m.n[1] as isize { *cell = CellType::NorthEast; }
+                else { *cell = CellType::East; }
+            }
+            else if i >= m.n[0] as isize {
+                if j < 0 { *cell = CellType::SouthWest; }
+                else if j >= m.n[0] as isize { *cell = CellType::NorthWest; } 
+                else{ *cell = CellType::West; }
+            }
+        }
 
         CartesianDataFrame2D
         {
             n_ghost,
             data:  vec![0.0; n_nodes],
-            n_grown: m.n.clone().iter().map(|n| n + 2*n_ghost).collect(),
+            n_grown,
             underlying_mesh: Rc::clone(m),
             n_comp,
             n_nodes,
+            cell_type,
         }
     }
 
@@ -379,6 +420,7 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D{
 
     /// Determines if the cell at (i,j) is a valid cell (returns true) or a ghost
     /// cell (returns false)
+    /// This will eventually be depricated in favour of the cell_type element in the data structure
     fn ij_is_valid_cell(&self, i: isize, j: isize) -> bool {
         let above_zero = i >= 0 && j >= 0;
 
@@ -412,13 +454,15 @@ impl <'a> Iterator for CartesianDataFrameIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         // progress the current index to skip ghost cells
         while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
-                                  !self.df.p_is_valid_cell(self.current_indx) {
+                                  // !self.df.p_is_valid_cell(self.current_indx) {
+                                  !(self.df.cell_type[self.current_indx] == CellType::Valid) {
             self.current_indx += 1;
         }
 
         // check if the next item exists
         if self.current_indx <= self.df.n_nodes-self.df.n_comp 
-                   && self.df.p_is_valid_cell(self.current_indx){
+                   //&& self.df.p_is_valid_cell(self.current_indx){
+                    && self.df.cell_type[self.current_indx] == CellType::Valid {
             // access and return next item 
             let ptr = self.df.data.as_mut_ptr();
             let next_data: Option<Self::Item>;
@@ -435,6 +479,27 @@ impl <'a> Iterator for CartesianDataFrameIter<'a> {
     }
 }
 
+// impl <'a> Iterator for &'a CartesianDataFrameIter<'a>{
+//     type Item = &'a Real;
+
+//     fn next(self) -> Option<Self::Item>{
+//         while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
+//                                    !self.df.p_is_valid_cell(self.current_indx){
+//             self.current_indx += 1;
+//         }
+
+//         let next_data: Option::<Self::Item>;
+//         if self.current_indx <= self.df.n_nodes - self.df.n_comp && self.df.p_is_valid_cell(self.current_indx){
+//             next_data = Some(&self.df.data[self.current_indx]);
+//             self.current_indx += 1;
+//             next_data
+//         }
+//         else{
+//             None
+//         }
+//     }
+// }
+
 impl <'a> IntoIterator for &'a mut CartesianDataFrame2D{
     type Item = &'a mut Real;
     type IntoIter = CartesianDataFrameIter<'a>;
@@ -447,11 +512,16 @@ impl <'a> IntoIterator for &'a mut CartesianDataFrame2D{
     }
 }
 
-// impl <'a> std::IntoIter for &'a CartesianDataFrame2D{
+// impl <'a> IntoIterator for &'a CartesianDataFrame2D{
 //     type Item = &'a Real;
 //     type IntoIter = CartesianDataFrameIter<'a>;
 
-
+//     fn into_iter(self) -> Self::IntoIter{
+//         Self::IntoIter{
+//             current_indx: 0,
+//             df: self,
+//         }
+//     }
 // }
 
 /// Struct to iterate over a data frame, with the current index and the data itself
@@ -762,6 +832,44 @@ mod tests{
                 5.0, 5.0, 5.0, 5.0, 5.0,
                 7.0, 7.0, 7.0, 7.0, 7.0, 
                 9.0, 9.0, 9.0, 9.0, 9.0
+            ]
+        );
+
+    }
+
+    #[test]
+    fn node_type () {
+        let m2 = CartesianMesh2D::new([0.0,0.0], [6.0, 6.0], [3,3]);
+        let df2 = CartesianDataFrame2D::new_from(&m2, 1, 1);
+
+        assert_eq!(
+            df2.cell_type,
+            vec![
+                CellType::SouthEast,
+                CellType::South,
+                CellType::South,
+                CellType::South,
+                CellType::SouthWest,
+                CellType::East,
+                CellType::Valid,
+                CellType::Valid,
+                CellType::Valid,
+                CellType::West,
+                CellType::East,
+                CellType::Valid,
+                CellType::Valid,
+                CellType::Valid,
+                CellType::West,
+                CellType::East,
+                CellType::Valid,
+                CellType::Valid,
+                CellType::Valid,
+                CellType::West,
+                CellType::NorthEast,
+                CellType::North,
+                CellType::North,
+                CellType::North,
+                CellType::NorthWest
             ]
         );
 
