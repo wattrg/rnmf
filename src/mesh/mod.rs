@@ -11,3 +11,4 @@ pub mod cartesian2d;
 pub mod cartesian_any_d;
 
 
+pub trait DataFrameContainer {}
