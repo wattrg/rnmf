@@ -302,6 +302,22 @@ impl CartesianDataFrame2D {
             .map(|(_,val)| val)
             .collect()
     }
+
+    /// create an immutable iterator over the data
+    pub fn iter(&self) -> CartesianDataFrame2DIter {
+        CartesianDataFrame2DIter{
+            df: self,
+            current_indx: 0,
+        }
+    } 
+
+    /// create a mutable iterator over the data
+    pub fn iter_mut(&mut self) -> CartesianDataFrame2DIterMut {
+        CartesianDataFrame2DIterMut {
+            df: self,
+            current_indx: 0,
+        }
+    }
 }
 
 impl core::ops::IndexMut<(isize, isize, usize)> for CartesianDataFrame2D {
