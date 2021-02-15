@@ -31,7 +31,7 @@ fn get_laplace(phi: &CartesianDataFrame2D, model: &Config<UserModel>) -> Cartesi
 
 pub fn get_source(phi: &CartesianDataFrame2D, config: &Config<UserModel>) -> CartesianDataFrame2D {
     let mut source = CartesianDataFrame2D::new_from(&phi.underlying_mesh, 1, 1);
-    for ((i,j,_), src) in source.into_iter().enumerate_index(){
+    for ((i,j,_), src) in &mut source.iter_mut().enumerate_index(){
         *src = -(1.0 - 1.0/config.model.relax)/mu(i,j,&phi.underlying_mesh.dx, config);
     }
     &source * &get_laplace(phi, config)
