@@ -33,7 +33,7 @@ impl UserConfig for UserModel{
         }
     }
 
-    fn lua_constructor(self, lua_ctx: Context)->rlua::Function{
+    fn lua_constructor(lua_ctx: Context)->rlua::Function{
         lua_ctx.create_function(|_,model: rlua::Table|
             Ok(UserModel{
                 h_far: model.get::<_,RealVec2>("H_far")

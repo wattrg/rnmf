@@ -1,55 +1,79 @@
 use rlua::{Lua, UserData, Context};
 use std::fs;
 use crate::*;
-use crate::mesh::cartesian2d::CartesianDataFrame2D;
 use colored::*;
 use std::process::Command;
 use std::collections::HashMap;
 
 pub trait UserConfig: UserData + Clone {
     fn new()->Self;
-    fn lua_constructor(self, lua_ctx: Context)->rlua::Function;
+    fn lua_constructor(lua_ctx: Context)->rlua::Function;
 }
 
-pub struct Actions<T: UserConfig>{
-    pub actions: Vec<Action<T>>
+#[derive(Clone)]
+pub struct Actions{
+    pub actions: Vec<Action>
 }
-impl <T: UserConfig> Actions<T>{
-    pub fn new()->Actions<T>{
+impl UserData for Actions{}
+impl UserConfig for Actions{
+    fn new()->Actions{
         Actions{
             actions: Vec::new(),
         }
     }
+
+    fn lua_constructor(lua_ctx: Context)->rlua::Function{
+        lua_ctx.create_function(|_,actions: Action|
+            Ok(
+                //Actions {actions: actions.get::<_,Vec<Action>>(1).expect("failed reading actions"),}
+                Actions {actions: vec![actions]}
+            )
+        ).expect("failed reading Actions from lua file")
+    }
+
 }
 
 #[derive(Clone)]
-pub struct Action<T: UserConfig>{
+pub struct Action{
     pub name: String,
-    pub pre_action: Option<fn(&Config<T>)>,
-    pub action: Option<fn(&CartesianDataFrame2D, &Config<T>)>,
+    //pub pre_action: Option<fn(&Config<T>)>,
+    //pub action: Option<fn(&CartesianDataFrame2D, &Config<T>)>,
+    pub action: String,
     pub iters: usize,
-    pub stop: Option<f64>,
+    //pub stop: Option<f64>,
 }
-impl <T: UserConfig> UserData for Action<T>{}
-
-
-impl <T: UserConfig> Action<T>{
-    pub fn new()->Action<T>{
-        Action{
+impl UserConfig for Action {
+    fn new()->Self{
+        Self{
             name: String::from(""),
-            pre_action: Option::None,
-            action: Option::None,
+            action: String::from(""),
             iters: 0,
-            stop: Option::None,
         }
     }
+
+    fn lua_constructor(lua_ctx: Context)->rlua::Function{
+        lua_ctx.create_function(|_,action: rlua::Table|
+            Ok(
+                Action{
+                    name: action.get::<_,String>("name").expect("failed reading action name"),
+                    action: action.get::<_,String>("action").expect("failed reading action"),
+                    iters: action.get::<_,usize>("iterations")
+                                 .expect("failed reading number of iterations for action"),
+                })
+        ).expect("failed creating action from lua file ")
+    }
 }
+
+impl  UserData for Action{}
+
+
 
 pub struct Config<T: UserConfig>{
     pub geom: GeomConfig,
     pub model: T,
-    pub actions: Actions<T>,
+    pub actions: Actions,
 }
+
 impl <T: UserConfig> Config<T>{
     pub fn new(user_config: T)->Config<T>{
         Config{
@@ -94,7 +118,7 @@ pub fn init<T: 'static>(args: Vec<String>, user_model: T, out_cb:fn()->HashMap<S
                            .unwrap()
                            .stdout).unwrap()[0..7];
 
-    println!("{}", format!("rnmf-{}: version {}", commit, version).green().bold());
+    println!("{}", format!("rnmf {}-{}", version, commit).green().bold());
     if cfg!(feature = "disable_double") {
         println!("using single precision");
     }
@@ -143,12 +167,16 @@ pub fn read_lua<T: 'static>(lua_loc: &str, user_model: T) -> Result<Config<T>, s
             Ok(IntVec2([x, y]))
         ).expect("Failed creating 'UIntVec' constructor for lua");
 
-        let user_model_constructor = user_model.lua_constructor(lua_ctx);
+        let user_model_constructor = T::lua_constructor(lua_ctx);
+        let actions_constructor = Actions::lua_constructor(lua_ctx);
+        let action_constructor = Action::lua_constructor(lua_ctx);
 
         globals.set("RealVec2", realvec2_constructor).unwrap();
         globals.set("UIntVec2", uintvec2_constructor).unwrap();
         globals.set("IntVec2", intvec2_constructor).unwrap();
         globals.set("Model", user_model_constructor).unwrap();
+        globals.set("Actions", actions_constructor).unwrap();
+        globals.set("Action", action_constructor).unwrap();
 
 
 
@@ -174,6 +202,7 @@ pub fn read_lua<T: 'static>(lua_loc: &str, user_model: T) -> Result<Config<T>, s
         }
 
         conf.model = globals.get::<_,T>("model").expect("failed reading model parameters");
+        conf.actions = globals.get::<_,Actions>("actions").expect("failed reading Actions");
 
     });
     Ok(conf)
