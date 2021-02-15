@@ -167,12 +167,13 @@ pub fn write_vtk(loc: &str,
         title: String::from(""),
         byte_order,
         data: vtk_data_set,
+        file_path: Some(file.clone().into()),
     };
 
 
 
     // write file
-    match vtkio::export(vtk_model, file){
+    match vtk_model.export(file){
         Ok(_) => {}
         Err(vtkio::Error::IO(err))  => {
             pb.println(format!("      {} failed writing vtk file: {}", "Warning:".yellow(), err));

@@ -15,10 +15,11 @@ path="src/lib.rs"
 [features]
 disable_double = []
 dumb_terminal = ["colored/no-color"]
+cartesian = []
 
 [dependencies]
 rlua = "0.17.0"
 #derive = {version="0.1.0", path = "./derive"}
 indicatif = "0.15.0"
-vtkio = {version="0.6.0", path = "../vtkio"}
+vtkio = {git = "https://github.com/elrnv/vtkio"}
 colored = "2.0"
