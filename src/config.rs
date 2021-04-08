@@ -3,7 +3,7 @@ use std::fs;
 use crate::*;
 use colored::*;
 use std::process::Command;
-use crate::solver::Actions;
+//use crate::solver::Actions;
 use crate::io::OutputCallBackHashMap;
 
 pub trait UserConfig: UserData + Clone {
@@ -12,19 +12,19 @@ pub trait UserConfig: UserData + Clone {
 }
 
 
-pub struct Config<'a, T: UserConfig>{
+pub struct Config<T: UserConfig>{
     pub geom: GeomConfig,
     pub model: T,
-    pub actions: Actions<'a, T>,
+    //pub actions: Actions<'a, T>,
     pub residual_iters: usize,
 }
 
-impl <T: UserConfig> Config<'_, T>{
-    pub fn new(user_config: T)->Config<'static, T>{
+impl <T: UserConfig> Config<T>{
+    pub fn new(user_config: T)->Config<T>{
         Config{
             geom: GeomConfig::new(),
             model: user_config,
-            actions: Actions::new(),
+            //actions: Actions::new(),
             residual_iters: 1,
         }
     }
@@ -53,7 +53,7 @@ impl UserData for UIntVec3 {}
 impl UserData for IntVec3 {}
 
 pub fn init<T: 'static>(args: Vec<String>, user_model: T, out_cb:fn()->OutputCallBackHashMap)
-    ->Result<(Config<'static, T>, OutputCallBackHashMap), std::io::Error>
+    ->Result<(Config<T>, OutputCallBackHashMap), std::io::Error>
     where 
         T: UserConfig    
 {
@@ -83,7 +83,7 @@ pub fn init<T: 'static>(args: Vec<String>, user_model: T, out_cb:fn()->OutputCal
 }
 
 /// function which executes a lua file (located at lua_loc), and returns the configuration
-pub fn read_lua<T: 'static>(lua_loc: String, user_model: T) -> Result<Config<'static, T>, std::io::Error>
+pub fn read_lua<T: 'static>(lua_loc: String, user_model: T) -> Result<Config<T>, std::io::Error>
     where 
         T: UserConfig,
 {
