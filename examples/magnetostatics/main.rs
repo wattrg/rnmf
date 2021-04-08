@@ -32,11 +32,11 @@ fn main() {
     let bc = BCs::new(vec![
         ComponentBCs::new(
             // lo bc
-            vec![BCType::Neumann(-conf.model.h_far[0]/mesh.dx[0]), 
-                 BCType::Neumann(-conf.model.h_far[1]/mesh.dx[1])], 
+            vec![BcType::Neumann(-conf.model.h_far[0]/mesh.dx[0]), 
+                 BcType::Neumann(-conf.model.h_far[1]/mesh.dx[1])], 
             // hi bc
-            vec![BCType::Neumann(-conf.model.h_far[0]/mesh.dx[0]), 
-                 BCType::Neumann(-conf.model.h_far[1]/mesh.dx[1])]  
+            vec![BcType::Neumann(-conf.model.h_far[0]/mesh.dx[0]), 
+                 BcType::Neumann(-conf.model.h_far[1]/mesh.dx[1])]  
         )
     ]);
 

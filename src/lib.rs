@@ -32,14 +32,15 @@ pub type Real = f64;
 
 /// Alias for either f32/f64 depending on if `disable_double` feature is enabled
 #[cfg(feature="disable_double")]
+#[derive(Default)]
 pub type Real = f32;
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RealVec1(pub [Real; 1]);
 
 /// Array containing two real numbers
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RealVec2(pub [Real; 2]);
 impl std::ops::Index<usize> for RealVec2{
     type Output = Real;
@@ -49,14 +50,14 @@ impl std::ops::Index<usize> for RealVec2{
 }
 
 /// Array containing three real numbers
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RealVec3(pub [Real; 3]);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct UIntVec1(pub [usize; 1]);
 
 /// Array containing two unsigned integers
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct UIntVec2(pub [usize; 2]);
 impl std::ops::Index<usize> for UIntVec2{
     type Output = usize;
@@ -66,14 +67,14 @@ impl std::ops::Index<usize> for UIntVec2{
 }
 
 /// Array containing three unsigned integers
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct UIntVec3(pub [usize; 3]);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct IntVec1(pub [isize; 1]);
 
 /// Slice containing two integers
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct IntVec2(pub [isize; 2]);
 impl std::ops::Index<usize> for IntVec2{
     type Output = isize;
@@ -83,7 +84,7 @@ impl std::ops::Index<usize> for IntVec2{
 }
 
 /// Slice containing three integers
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct IntVec3(pub [isize; 3]);
 
 

@@ -11,7 +11,7 @@ use crate::Real;
 use std::collections::HashMap;
 use super::DataFrameContainer;
 
-type DFHashMap = HashMap<String, CartesianDataFrame2D>;
+type DfHashMap = HashMap<String, CartesianDataFrame2D>;
 
 /// Structure containing data to define a CartesianMesh
 #[derive(Debug, Clone)]
@@ -54,7 +54,7 @@ impl CartesianMesh2D {
     pub fn new(lo: [Real; 2], hi: [Real; 2], n: [usize; 2]) -> Rc<CartesianMesh2D>
     {
         let mut dx = [0.0; 2];
-        for i_dim in 0..2 as usize{
+        for i_dim in 0..2_usize{
             dx[i_dim] = (hi[i_dim] - lo[i_dim])/(n[i_dim] as Real);
         }
 
@@ -245,7 +245,7 @@ pub struct CartesianBlock {
     mesh: CartesianMesh2D,
 
     /// The dataframes for the block, stored in a hashmap so they can be identified by a name
-    dfs: DFHashMap,
+    dfs: DfHashMap,
 
     /// The blocks stored on the low side of the block. None if there is no block
     lo_connectivity: [Option<usize>; 2],
@@ -255,7 +255,7 @@ pub struct CartesianBlock {
 }
 
 // impl CartesianBlock {
-//     pub fn new(id: usize, mesh:CartesianMesh2D, dfs: DFHashMap) -> CartesianBlock{
+//     pub fn new(id: usize, mesh:CartesianMesh2D, dfs: DfHashMap) -> CartesianBlock{
 //         CartesianBlock{
 //             id,
 //             name: None,
@@ -275,10 +275,8 @@ impl core::ops::Index<&str> for CartesianBlock {
     fn index (&self, name: &str) -> &Self::Output {
         &self.dfs
              .get(name)
-             .expect(
-                &format!(
-                    "{} not in CartesianBlock with id: {}, name: {:?}", name, self.id, self.name
-                )
+             .unwrap_or_else(|| 
+                panic!("{} not in CartesianBlock with id: {}, name: {:?}", name, self.id, self.name)
             )
     }
 }
@@ -417,7 +415,7 @@ pub trait BoundaryCondition2D {
 
 
 impl <'a> BoundaryCondition2D for CartesianDataFrame2D{
-    /// Fill the ghost nodes of the CartesianDataFrame based on BCType
+    /// Fill the ghost nodes of the CartesianDataFrame based on BcType
     fn fill_bc (&mut self, bc: &BCs) {
         for i_comp in 0..self.n_comp{
             for i_dim in 0..2{
@@ -425,10 +423,10 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D{
                 let bc_hi = &bc.bcs[i_comp].hi[i_dim];
                 // low boundary condition
                 match bc_lo {
-                    BCType::Prescribed(_values) => {
+                    BcType::Prescribed(_values) => {
                         panic!("Prescribed boundary conditions not supported yet");
                     }
-                    BCType::Neumann(gradient) => {
+                    BcType::Neumann(gradient) => {
                         if self.n_ghost >= 2 {panic!{"more than two ghost cells not supported for Neumann BC yet"};}
                         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
                             if i_dim == 0 {
@@ -439,7 +437,7 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D{
                             }
                         }
                     }
-                    BCType::Dirichlet(value) => {
+                    BcType::Dirichlet(value) => {
                         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
                             if i_dim == 0{
                                 let m = -(value - self[(0,i,i_comp)]);
@@ -455,11 +453,11 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D{
 
                 // high boundary condition
                 match bc_hi {
-                    BCType::Prescribed(_values) => {
+                    BcType::Prescribed(_values) => {
                         panic!("Prescribed boundary condition not yet supported");
                     }
                 
-                    BCType::Neumann(gradient) => {
+                    BcType::Neumann(gradient) => {
                         if self.n_ghost >= 2 {panic!{"more than two ghost cells not supported for Neumann BC yet"};}
                         let hi = vec![self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
                         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
@@ -472,7 +470,7 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D{
                         }
                     }
                     
-                    BCType::Dirichlet(value) => {
+                    BcType::Dirichlet(value) => {
                         let hi = vec![self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
                         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
                             if i_dim == 0{

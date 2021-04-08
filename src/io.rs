@@ -128,7 +128,7 @@ pub fn write_vtk(loc: &str,
                     data: iobuffer,
                 };
 
-                cell_data.push(Attribute::DataArray(DataArray::from(dab)));
+                cell_data.push(Attribute::DataArray(dab));
 
             }
             Err(msg) => {

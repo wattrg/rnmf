@@ -22,7 +22,8 @@ pub struct Config<T: UserConfig>{
 impl <T: UserConfig> Config<T>{
     pub fn new(user_config: T)->Config<T>{
         Config{
-            geom: GeomConfig::new(),
+            //geom: GeomConfig::new(),
+            geom: Default::default(),
             model: user_config,
             //actions: Actions::new(),
             residual_iters: 1,
@@ -30,20 +31,21 @@ impl <T: UserConfig> Config<T>{
     }
 }
 
+#[derive(Default)]
 pub struct GeomConfig{
     pub dim: usize,
     pub length: RealVec2,
     pub n_cells: UIntVec2,
 }
-impl GeomConfig{
-    pub fn new() -> GeomConfig{
-        GeomConfig{
-            dim: 0,
-            length: RealVec2([0.0, 0.0]),
-            n_cells: UIntVec2([0, 0]),
-        }
-    }
-}
+// impl GeomConfig{
+//     pub fn new() -> GeomConfig{
+//         GeomConfig{
+//             dim: 0,
+//             length: RealVec2([0.0, 0.0]),
+//             n_cells: UIntVec2([0, 0]),
+//         }
+//     }
+// }
 
 impl UserData for RealVec2 {}
 impl UserData for UIntVec2 {}
@@ -72,7 +74,7 @@ pub fn init<T: 'static>(args: Vec<String>, user_model: T, out_cb:fn()->OutputCal
         println!("using double precision");
     }
 
-    if args.len() < 1 {
+    if args.is_empty() {
         println!("{} Location of lua configuration script not given.", "Error:".red());
         panic!();
     }
@@ -87,7 +89,7 @@ pub fn read_lua<T: 'static>(lua_loc: String, user_model: T) -> Result<Config<T>,
     where 
         T: UserConfig,
 {
-    let mut conf = Config::new(user_model.clone());
+    let mut conf = Config::new(user_model);
 
     // load the contents of the file
     let lua_file = fs::read_to_string(lua_loc).expect("Could not read lua file");

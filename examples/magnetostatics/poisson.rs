@@ -1,6 +1,6 @@
 
 use super::mesh::cartesian2d::*;
-use super::boundary_conditions::{BCType, BCs, ComponentBCs};
+use super::boundary_conditions::{BcType, BCs, ComponentBCs};
 use crate::config::Config;
 use super::model::UserModel;
 use rnmf::Real;
@@ -20,8 +20,8 @@ fn get_laplace(phi: &CartesianDataFrame2D, model: &Config<UserModel>) -> Cartesi
     let bc = BCs::new(
         vec![
             ComponentBCs::new(
-                vec![BCType::Dirichlet(0.0), BCType::Dirichlet(0.0)],
-                vec![BCType::Dirichlet(0.0), BCType::Dirichlet(0.0)]
+                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(0.0)],
+                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(0.0)]
             )
         ]
     );
@@ -81,13 +81,6 @@ pub fn solve_poisson(psi_init: &CartesianDataFrame2D,
             }
         }
         psi.fill_bc(&bc);
-    }
-    for _ in 0..config.model.n_sub_iter{
-        for ((i,j,_),val) in psi.iter_mut().enumerate_index(){
-            *val = alpha * rhs[(i,j,0)] + 
-                                beta * (psi[(i+1,j,0)] + psi[(i-1,j,0)]) + 
-                                gamma * (psi[(i,j+1,0)] + psi[(i,j-1,0)]);
-        }
     }
     psi
 

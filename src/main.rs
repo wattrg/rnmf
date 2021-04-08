@@ -1,6 +1,6 @@
 use rnmf::*;
 use boundary_conditions::*;
-use crate::mesh::cartesian_any_d::*;
+use crate::mesh::cartesian2d::*;
 use std::env;
 
 fn main()  {
@@ -12,23 +12,23 @@ fn main()  {
     }
 
     // create the mesh 
-    let u1 = CartesianMesh::new(vec![0.0, 0.0], vec![6.0, 6.0], vec![3, 3], 2);
+    let u1 = CartesianMesh2D::new([0.0, 0.0], [6.0, 6.0], [3, 3]);
    
     // create some variables on top of the mesh
-    let mut variable1 = CartesianDataFrame::new_from(&u1, 2, 1);
-    let mut variable2 = CartesianDataFrame::new_from(&u1, 1, 1);
+    let mut variable1 = CartesianDataFrame2D::new_from(&u1, 2, 1);
+    let mut variable2 = CartesianDataFrame2D::new_from(&u1, 1, 1);
 
     // fill the initial conditions
-    variable1.fill_ic(|x,y,_,n| x * y * (n + 1) as Real);
-    variable2.fill_ic(|x,y,_,_| x + y);
+    variable1.fill_ic(|x,y,n| x * y * (n + 1) as Real);
+    variable2.fill_ic(|x,y,_| x + y);
 
     let bc = BCs::new(vec![
         ComponentBCs::new(
                 // x direction
-                vec![BCType::Dirichlet(0.0), BCType::Dirichlet(1.0)], // lo
+                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(1.0)], // lo
 
                 // y direction
-                vec![BCType::Dirichlet(0.0), BCType::Dirichlet(1.0)], // hi
+                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(1.0)], // hi
         )]
     );
 

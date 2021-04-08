@@ -340,7 +340,7 @@ impl core::ops::Index<(isize, isize, isize, usize)> for CartesianDataFrame{
 
 
 impl <'a> BoundaryCondition for CartesianDataFrame{
-    /// Fill the ghost nodes of the CartesianDataFrame based on BCType
+    /// Fill the ghost nodes of the CartesianDataFrame based on BcType
     fn fill_bc (&mut self, bc: &BCs) {
         for i_comp in 0..self.n_comp{
             for i_dim in 0..self.underlying_mesh.dim{
@@ -348,7 +348,7 @@ impl <'a> BoundaryCondition for CartesianDataFrame{
                 let bc_hi = &bc.bcs[i_comp].hi[i_dim];
                 // low boundary condition
                 match bc_lo {
-                    BCType::Prescribed(values) => {
+                    BcType::Prescribed(values) => {
                         match self.underlying_mesh.dim {
                             1 => {
                                 for (i, &val) in values.iter().rev().enumerate() {
@@ -361,7 +361,7 @@ impl <'a> BoundaryCondition for CartesianDataFrame{
                             
                         }
                     }
-                    BCType::Neumann(gradient) => {
+                    BcType::Neumann(gradient) => {
                         match self.underlying_mesh.dim{
                             1 => {
                                 for i in 0usize..self.n_ghost as usize {
@@ -384,7 +384,7 @@ impl <'a> BoundaryCondition for CartesianDataFrame{
                             }
                         }
                     }
-                    BCType::Dirichlet(value) => {
+                    BcType::Dirichlet(value) => {
                         match self.underlying_mesh.dim {
                             1 => {
                                 let m: Real = self.data[self.n_ghost as usize] - value;
@@ -415,7 +415,7 @@ impl <'a> BoundaryCondition for CartesianDataFrame{
                 // high boundary condition
                 let n: usize = self.data.len() - 1;
                 match bc_hi {
-                    BCType::Prescribed(values) => {
+                    BcType::Prescribed(values) => {
                         match self.underlying_mesh.dim{
                             1 => {
                                 for (i, val) in values.iter().enumerate() {
@@ -428,7 +428,7 @@ impl <'a> BoundaryCondition for CartesianDataFrame{
                         }
                     }
                 
-                    BCType::Neumann(gradient) => {
+                    BcType::Neumann(gradient) => {
                         match self.underlying_mesh.dim{
                             1 => {
                                 for i in 1usize..self.n_ghost as usize + 1 {
@@ -454,7 +454,7 @@ impl <'a> BoundaryCondition for CartesianDataFrame{
                             }
                         }
                     }
-                    BCType::Dirichlet(value) => {
+                    BcType::Dirichlet(value) => {
                         match self.underlying_mesh.dim {
                             1 => { 
                                 let m = value - self.data[n - self.n_ghost as usize];
@@ -997,8 +997,8 @@ mod tests{
         cdf.fill_ic(|x,_,_,_| x + 1.0);
         let bc = BCs::new(vec![
             ComponentBCs::new(
-                    vec![BCType::Dirichlet(0.0)], 
-                    vec![BCType::Dirichlet(1.0)],
+                    vec![BcType::Dirichlet(0.0)], 
+                    vec![BcType::Dirichlet(1.0)],
             )]
         );
         cdf.fill_bc(&bc);
@@ -1015,8 +1015,8 @@ mod tests{
         cdf.fill_ic(|x, _,_,_| x + 1.0);
         let bc = BCs::new(vec![
             ComponentBCs::new(
-                    vec![BCType::Neumann(0.0)], 
-                    vec![BCType::Neumann(1.0)],
+                    vec![BcType::Neumann(0.0)], 
+                    vec![BcType::Neumann(1.0)],
             )]
         );
         cdf.fill_bc(&bc);
@@ -1033,8 +1033,8 @@ mod tests{
         cdf.fill_ic(|x, _,_,_| x + 1.0);
         let bc = BCs::new(vec![
             ComponentBCs::new(
-                    vec![BCType::Prescribed(vec![-1.0, -2.0])], 
-                    vec![BCType::Prescribed(vec![15.0, 16.0])],
+                    vec![BcType::Prescribed(vec![-1.0, -2.0])], 
+                    vec![BcType::Prescribed(vec![15.0, 16.0])],
             )]
         );
         cdf.fill_bc(&bc);

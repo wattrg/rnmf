@@ -18,7 +18,7 @@ pub trait BoundaryCondition {
 
 /// Available boundary conditions
 #[allow(dead_code)]
-pub enum BCType {
+pub enum BcType {
     /// user supplies a vector which is placed into ghost cells.
     /// The first entry in the vector is put in the ghost cell closest to
     /// the valid computational domain
@@ -35,15 +35,15 @@ pub enum BCType {
 /// Specifies the boundary condition for each component of the data
 pub struct ComponentBCs {
     /// Specifies the boundary condition for the lower edges
-    pub lo: Vec<BCType>,
+    pub lo: Vec<BcType>,
 
     /// Specifies the boundary condition for the upper edges
-    pub hi: Vec<BCType>,
+    pub hi: Vec<BcType>,
 }
 
 
 impl ComponentBCs {
-    pub fn new(lo: Vec<BCType>, hi: Vec<BCType>) -> ComponentBCs{
+    pub fn new(lo: Vec<BcType>, hi: Vec<BcType>) -> ComponentBCs{
         ComponentBCs {
             lo,
             hi,
