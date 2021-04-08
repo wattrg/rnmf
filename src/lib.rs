@@ -20,6 +20,12 @@ pub mod boundary_conditions;
 /// Module to assist with input and output 
 pub mod io;
 
+/// Module for handling global values
+pub mod global;
+
+// /// Module for handling the execution
+// pub mod solver;
+
 /// Alias for either f32/f64 depending on if `disable_double` feature is enabled
 #[cfg(not(feature="double_precision"))]
 pub type Real = f64;

@@ -16,7 +16,7 @@ model = Model({
 })
 
 -- actions
-actions = Actions(
-    Action({name="solve", action = "solve", iterations=20})
-)
+-- actions = Actions(
+--     Action({name="solve", action = "solve", iterations=20})
+-- )
 

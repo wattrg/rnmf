@@ -59,7 +59,7 @@ impl UserConfig for UserModel{
 
 pub fn output_callbacks()->HashMap<String, crate::io::OutputCallBack>{
     // set up hash map for outputting variables
-    let mut output: HashMap<String, crate::io::OutputCallBack> = HashMap::new();
+    let mut output: crate::io::OutputCallBackHashMap = HashMap::new();
     output.insert("psi".to_string(), get_psi);
     output.insert("h".to_string(), get_h);
     output

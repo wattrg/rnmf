@@ -8,6 +8,7 @@ use crate::Real;
 use std::convert::TryFrom;
 
 pub type OutputCallBack = fn(&CartesianDataFrame2D) -> Result<VtkData, String>;
+pub type OutputCallBackHashMap =std::collections::HashMap<String, OutputCallBack>;
 
 /// Extension to `indicatif::ProgressBar` to simplify its use
 pub trait RnmfProgressBar {
@@ -97,7 +98,7 @@ pub fn write_vtk(loc: &str,
                  name: &str, 
                  iter: usize, 
                  df: &CartesianDataFrame2D,
-                 data: &std::collections::HashMap<String, OutputCallBack>,
+                 data: & OutputCallBackHashMap,
                  pb: &ProgressBar){
 
     // generating file name information, and print message letting user know we are writing a vtk file

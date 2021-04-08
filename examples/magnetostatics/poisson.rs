@@ -8,15 +8,15 @@ use rnmf::Real;
 fn get_laplace(phi: &CartesianDataFrame2D, model: &Config<UserModel>) -> CartesianDataFrame2D {
     let mut lap = CartesianDataFrame2D::new_from(&phi.underlying_mesh, 1, 1);
     let dx = &phi.underlying_mesh.dx;
-    for i in 0..phi.underlying_mesh.n[0] as isize {
-        for j in 0..phi.underlying_mesh.n[1] as isize {
-            lap[(i,j,0)] = phi[(i+1,j  ,0)]*(mu(i+1,j  ,dx,model) + mu(i,j,dx,model))/2.0
-                         + phi[(i-1,j  ,0)]*(mu(i-1,j  ,dx,model) + mu(i,j,dx,model))/2.0
-                         + phi[(i  ,j+1,0)]*(mu(i  ,j+1,dx,model) + mu(i,j,dx,model))/2.0
-                         + phi[(i  ,j-1,0)]*(mu(i  ,j-1,dx,model) + mu(i,j,dx,model))/2.0
-                         - phi[(i  ,j  ,0)]*(mu(i+1,j  ,dx,model) + mu(i-1,j,dx,model)+mu(i,j+1,dx,model)+mu(i,j-1,dx,model)+4.0*mu(i,j,dx,model))/2.0;
-        }
+
+    for ((i,j,_), lap) in lap.iter_mut().enumerate_index(){
+        *lap = phi[(i+1,j  ,0)]*(mu(i+1,j  ,dx,model) + mu(i,j,dx,model))/2.0
+                        + phi[(i-1,j  ,0)]*(mu(i-1,j  ,dx,model) + mu(i,j,dx,model))/2.0
+                        + phi[(i  ,j+1,0)]*(mu(i  ,j+1,dx,model) + mu(i,j,dx,model))/2.0
+                        + phi[(i  ,j-1,0)]*(mu(i  ,j-1,dx,model) + mu(i,j,dx,model))/2.0
+                        - phi[(i  ,j  ,0)]*(mu(i+1,j  ,dx,model) + mu(i-1,j,dx,model)+mu(i,j+1,dx,model)+mu(i,j-1,dx,model)+4.0*mu(i,j,dx,model))/2.0;
     }
+    
     let bc = BCs::new(
         vec![
             ComponentBCs::new(
@@ -70,6 +70,8 @@ pub fn solve_poisson(psi_init: &CartesianDataFrame2D,
     let beta = dy2 / (2.0 * (dx2 + dy2));
     let gamma = dx2 / (2.0 * (dx2 + dy2));
 
+    // since we're directly updating psi with itself, we can't use the IterMut trait
+    // for the moment we just have to use regular loops
     for _ in 0..config.model.n_sub_iter {
         for i in 0..psi.underlying_mesh.n[0] as isize{
             for j in 0..psi.underlying_mesh.n[1] as isize {
@@ -80,16 +82,21 @@ pub fn solve_poisson(psi_init: &CartesianDataFrame2D,
         }
         psi.fill_bc(&bc);
     }
+    for _ in 0..config.model.n_sub_iter{
+        for ((i,j,_),val) in psi.iter_mut().enumerate_index(){
+            *val = alpha * rhs[(i,j,0)] + 
+                                beta * (psi[(i+1,j,0)] + psi[(i-1,j,0)]) + 
+                                gamma * (psi[(i,j+1,0)] + psi[(i,j-1,0)]);
+        }
+    }
     psi
 
 }
 
 pub fn sum(psi: &CartesianDataFrame2D)->Real{
     let mut psi_sum: Real = 0.0;
-    for i in 0..psi.underlying_mesh.n[0] as isize{
-        for j in 0..psi.underlying_mesh.n[1] as isize {
-            psi_sum += psi[(i,j,0)].abs();
-        }
+    for val in psi.iter(){
+        psi_sum += val.abs();
     }
     psi_sum
 }

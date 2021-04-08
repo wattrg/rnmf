@@ -11,9 +11,10 @@ use crate::Real;
 use std::collections::HashMap;
 use super::DataFrameContainer;
 
+type DFHashMap = HashMap<String, CartesianDataFrame2D>;
 
 /// Structure containing data to define a CartesianMesh
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CartesianMesh2D {
     /// The position of the nodes in the mesh
     pub node_pos: Vec<Real>,
@@ -230,16 +231,58 @@ pub struct CartesianDataFrame2D{
     cell_type: Vec<CellType>,
 }
 
+/// For parallel computations, the entire domain is split up into segments. A CartesianBlock
+/// contains all the information for one of these segments, with a cartesian mesh.
 #[derive(Debug, Clone)]
-pub struct Cdf2dContainer (HashMap<String, CartesianDataFrame2D>);
-impl core::ops::Deref for Cdf2dContainer {
-    type Target = HashMap<String, CartesianDataFrame2D>;
+pub struct CartesianBlock {
+    /// An id to identify the block, and will be used for identifying neighbouring blocks
+    id: usize,
 
-    fn deref (self: &'_ Self) -> &'_ Self::Target {
-        &self.0
+    /// Optional name for the block, to make identifying it easier for people
+    name: Option<String>,
+
+    /// The underlying mesh for this block
+    mesh: CartesianMesh2D,
+
+    /// The dataframes for the block, stored in a hashmap so they can be identified by a name
+    dfs: DFHashMap,
+
+    /// The blocks stored on the low side of the block. None if there is no block
+    lo_connectivity: [Option<usize>; 2],
+
+    /// The blocks stored on the high side of the block. None if there is no block
+    hi_connectivity: [Option<usize>; 2],
+}
+
+// impl CartesianBlock {
+//     pub fn new(id: usize, mesh:CartesianMesh2D, dfs: DFHashMap) -> CartesianBlock{
+//         CartesianBlock{
+//             id,
+//             name: None,
+//             mesh,
+//             dfs,
+//             lo_connectivity: [None, None],
+//             hi_connectivity: [None, None],
+//         }
+//     }
+
+//     pub fn fill_bc()
+// }
+
+impl core::ops::Index<&str> for CartesianBlock {
+    type Output = CartesianDataFrame2D;
+
+    fn index (&self, name: &str) -> &Self::Output {
+        &self.dfs
+             .get(name)
+             .expect(
+                &format!(
+                    "{} not in CartesianBlock with id: {}, name: {:?}", name, self.id, self.name
+                )
+            )
     }
 }
-impl DataFrameContainer for Cdf2dContainer {}
+impl DataFrameContainer for CartesianBlock {}
 
 
 
@@ -351,7 +394,7 @@ impl core::ops::Index<(isize, isize, usize)> for CartesianDataFrame2D{
     /// Borrows the element at (i,j,n). The valid cells are indexed from zero
     /// and ghost cells at the lower side of the domain are indexed with negative
     /// numbers.
-    fn index(&self, indx: (isize, isize, usize) ) -> &Real {
+    fn index(&self, indx: (isize, isize, usize) ) -> & Self::Output {
         let (i,j,n) = indx;
         let p = get_flat_index(i, j, n, &self.n_grown, self.n_ghost);
 
@@ -470,6 +513,7 @@ pub struct CartesianDataFrame2DIter<'a> {
     df: &'a CartesianDataFrame2D,
     current_indx: usize,
 }
+
 impl <'a> Iterator for CartesianDataFrame2DIter<'a>{
     type Item = &'a Real;
 

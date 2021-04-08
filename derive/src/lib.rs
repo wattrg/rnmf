@@ -14,6 +14,13 @@ pub fn user_config_derive(input: TokenStream) -> TokenStream {
     impl_user_config_macro(&ast)
 }
 
-fn impl_user_config_macro(ast: &syn::DeriveInput)->TokenStream{
-    let name = &ast.ident;
-}
+// fn impl_user_config_macro(ast: &syn::DeriveInput)->TokenStream{
+//     let name = &ast.ident;
+//     let gen = quote! {
+//         impl UserConfig or #name {
+//             fn new() -> Self {
+
+//             }
+//         }
+//     }
+// }

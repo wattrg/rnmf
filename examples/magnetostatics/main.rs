@@ -48,6 +48,7 @@ fn main() {
     });
     psi.fill_bc(&bc);
     
+    
     println!("Calculating solution:");
     let mut progress_bar = io::ProgressBar::create(conf.model.n_iter);
 
