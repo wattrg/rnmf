@@ -54,10 +54,10 @@ impl UserData for RealVec3 {}
 impl UserData for UIntVec3 {}
 impl UserData for IntVec3 {}
 
-pub fn init<T: 'static>(args: Vec<String>, user_model: T, out_cb:fn()->OutputCallBackHashMap)
-    ->Result<(Config<T>, OutputCallBackHashMap), std::io::Error>
+pub fn init<U: 'static, T>(args: Vec<String>, user_model: U, out_cb:fn()->OutputCallBackHashMap<T>)
+    ->Result<(Config<U>, OutputCallBackHashMap<T>), std::io::Error>
     where 
-        T: UserConfig    
+        U: UserConfig    
 {
     let version = env!("CARGO_PKG_VERSION");
     let commit = &String::from_utf8(

@@ -7,8 +7,8 @@ use colored::*;
 use crate::Real;
 use std::convert::TryFrom;
 
-pub type OutputCallBack = fn(&CartesianDataFrame2D) -> Result<VtkData, String>;
-pub type OutputCallBackHashMap =std::collections::HashMap<String, OutputCallBack>;
+pub type OutputCallBack<T> = fn(&CartesianDataFrame2D<T>) -> Result<VtkData<T>, String>;
+pub type OutputCallBackHashMap<T> =std::collections::HashMap<String, OutputCallBack<T>>;
 
 /// Extension to `indicatif::ProgressBar` to simplify its use
 pub trait RnmfProgressBar {
@@ -39,14 +39,14 @@ impl RnmfProgressBar for ProgressBar {
 
 
 
-pub struct VtkData {
-    data: Vec<Real>,
+pub struct VtkData<T> {
+    data: Vec<T>,
     data_type: ElementType,
 }
 
-impl TryFrom<CartesianDataFrame2D> for VtkData {
+impl TryFrom<CartesianDataFrame2D<Real>> for VtkData<Real> {
     type Error = String;
-    fn try_from(df: CartesianDataFrame2D) -> Result<Self, Self::Error>{
+    fn try_from(df: CartesianDataFrame2D<Real>) -> Result<Self, Self::Error>{
         match df.n_comp {
             1 => {
                 Ok(VtkData{
@@ -60,7 +60,7 @@ impl TryFrom<CartesianDataFrame2D> for VtkData {
                     for j in 0..df.underlying_mesh.n[1] as isize {
                         reshaped_data.push(df[(i,j,0)]);
                         reshaped_data.push(df[(i,j,1)]);
-                        reshaped_data.push(0.0);
+                        reshaped_data.push(df[(i,j,1)]);
                     }
                 }
                 Ok(VtkData{
@@ -97,8 +97,8 @@ impl TryFrom<CartesianDataFrame2D> for VtkData {
 pub fn write_vtk(loc: &str, 
                  name: &str, 
                  iter: usize, 
-                 df: &CartesianDataFrame2D,
-                 data: & OutputCallBackHashMap,
+                 df: &CartesianDataFrame2D<Real>,
+                 data: & OutputCallBackHashMap<Real>,
                  pb: &ProgressBar){
 
     // generating file name information, and print message letting user know we are writing a vtk file
@@ -120,7 +120,7 @@ pub fn write_vtk(loc: &str,
 
         match vec_data {
             Ok(dat) => {
-                let iobuffer = IOBuffer::F64(dat.data);
+                let iobuffer = IOBuffer::F64(dat.data.into());
                 
                 let dab = DataArrayBase{
                     name: String::from(name),

@@ -11,7 +11,7 @@ use crate::{Real, RealVec2, UIntVec2};
 use std::collections::HashMap;
 use super::DataFrameContainer;
 
-type DfHashMap = HashMap<String, CartesianDataFrame2D>;
+type DfHashMap<T> = HashMap<String, CartesianDataFrame2D<T>>;
 
 /// Structure containing data to define a CartesianMesh
 #[derive(Debug, Clone)]
@@ -209,13 +209,14 @@ enum CellType{
 
 /// Structure to store data defined on a `CartesianMesh`
 #[derive(Debug, Clone)]
-pub struct CartesianDataFrame2D{
+pub struct CartesianDataFrame2D<T>{
     /// The data is stored here
-    pub data: Vec<Real>,
+    pub data: Vec<T>,
 
     /// The number of ghost nodes, added to each side of the underlying `CartesianMesh`
     pub n_ghost: usize,
 
+    /// The number of cells in each direction, after the ghost cells have been added
     pub n_grown: UIntVec2,
 
     /// Reference to the underlying `CartesianMesh`
@@ -238,7 +239,7 @@ pub struct CartesianDataFrame2D{
 /// For parallel computations, the entire domain is split up into segments. A CartesianBlock
 /// contains all the information for one of these segments, with a cartesian mesh.
 #[derive(Debug, Clone)]
-pub struct CartesianBlock {
+pub struct CartesianBlock<T> {
     /// An id to identify the block, and will be used for identifying neighbouring blocks
     pub id: usize,
 
@@ -249,7 +250,7 @@ pub struct CartesianBlock {
     pub mesh: Rc<CartesianMesh2D>,
 
     /// The dataframes for the block, stored in a hashmap so they can be identified by a name
-    pub dfs: DfHashMap,
+    pub dfs: DfHashMap<T>,
 
     /// The blocks stored on the low side of the block. None if there is no block
     pub lo_connectivity: [Option<usize>; 2],
@@ -273,8 +274,8 @@ pub struct CartesianBlock {
 //     pub fn fill_bc()
 // }
 
-impl core::ops::Index<&str> for CartesianBlock {
-    type Output = CartesianDataFrame2D;
+impl <T> core::ops::Index<&str> for CartesianBlock<T> {
+    type Output = CartesianDataFrame2D<T>;
 
     fn index (&self, name: &str) -> &Self::Output {
         &self.dfs
@@ -284,18 +285,18 @@ impl core::ops::Index<&str> for CartesianBlock {
             )
     }
 }
-impl DataFrameContainer for CartesianBlock {}
+impl <T> DataFrameContainer for CartesianBlock<T> {}
 
 
 
 /// data structure to store data on CartesianMesh
-impl CartesianDataFrame2D {
+impl <T: Clone+Default> CartesianDataFrame2D<T> {
     /// generate new `CartesianDataFrame` from a given mesh, adding a given
     /// number of ghost nodes
     pub fn new_from(m: & Rc<CartesianMesh2D>, 
                     bc: BCs,
                     n_comp: usize, 
-                    n_ghost: usize) -> CartesianDataFrame2D
+                    n_ghost: usize) -> CartesianDataFrame2D<T>
     {
         let n_nodes = ((m.n[0] + 2*n_ghost) * (m.n[1] + 2*n_ghost))*n_comp;
 
@@ -328,7 +329,7 @@ impl CartesianDataFrame2D {
         CartesianDataFrame2D
         {
             n_ghost,
-            data:  vec![0.0; n_nodes],
+            data: vec![std::default::Default::default(); n_nodes],
             n_grown,
             underlying_mesh: Rc::clone(m),
             n_comp,
@@ -339,7 +340,7 @@ impl CartesianDataFrame2D {
     }
 
     /// Fill `CartesianDataFrame` from a initial condition function
-    pub fn fill_ic (&mut self, ic: impl Fn(Real, Real, usize)->Real)
+    pub fn fill_ic (&mut self, ic: impl Fn(Real, Real, usize)->T)
     {
         for (pos, val) in self.into_iter().enumerate_pos(){
             let (x,y,n) = pos;
@@ -354,7 +355,7 @@ impl CartesianDataFrame2D {
     }
 
     /// returns a flat vector containing only the valid cells
-    pub fn get_valid_cells(&self) -> Vec<Real> {
+    pub fn get_valid_cells(&self) -> Vec<T> {
         self.data
             .clone()
             .into_iter()
@@ -365,7 +366,7 @@ impl CartesianDataFrame2D {
     }
 
     /// create an immutable iterator over the data
-    pub fn iter(&self) -> CartesianDataFrame2DIter {
+    pub fn iter(&self) -> CartesianDataFrame2DIter<T> {
         CartesianDataFrame2DIter{
             df: self,
             current_indx: 0,
@@ -373,7 +374,7 @@ impl CartesianDataFrame2D {
     } 
 
     /// create a mutable iterator over the data
-    pub fn iter_mut(&mut self) -> CartesianDataFrame2DIterMut {
+    pub fn iter_mut(&mut self) -> CartesianDataFrame2DIterMut<T> {
         CartesianDataFrame2DIterMut {
             df: self,
             current_indx: 0,
@@ -381,10 +382,10 @@ impl CartesianDataFrame2D {
     }
 }
 
-impl core::ops::IndexMut<(isize, isize, usize)> for CartesianDataFrame2D {
+impl <T> core::ops::IndexMut<(isize, isize, usize)> for CartesianDataFrame2D<T> {
     /// Exclusively borrows element at (i,j,n). The valid cells are indexed from zero 
     /// and ghost cells at the lower side of the domain are indexed with negative numbers
-    fn index_mut(&mut self, indx: (isize,isize,usize)) -> &mut Real {
+    fn index_mut(&mut self, indx: (isize,isize,usize)) -> &mut T {
         let (i,j,n) = indx;
         let p = get_flat_index(i,j,n,&self.n_grown,self.n_ghost);
         &mut self.data[p]
@@ -392,8 +393,8 @@ impl core::ops::IndexMut<(isize, isize, usize)> for CartesianDataFrame2D {
 }
 
 
-impl core::ops::Index<(isize, isize, usize)> for CartesianDataFrame2D{
-    type Output = Real;
+impl <T> core::ops::Index<(isize, isize, usize)> for CartesianDataFrame2D<T>{
+    type Output = T;
 
     #[allow(dead_code)] 
     /// Borrows the element at (i,j,n). The valid cells are indexed from zero
@@ -411,7 +412,8 @@ impl core::ops::Index<(isize, isize, usize)> for CartesianDataFrame2D{
 pub trait BoundaryCondition2D {
     /// function which fills the boundary conditions
     fn fill_bc(&mut self);
-
+}
+pub trait GhostCells{
     /// checks if the cell at (i,j,k) contains a valid or a ghost cell. Returns true if valid,
     /// and returns false if ghost
     fn ij_is_valid_cell(&self, i: isize, j: isize) -> bool;
@@ -421,7 +423,7 @@ pub trait BoundaryCondition2D {
 }
 
 
-impl <'a> BoundaryCondition2D for CartesianDataFrame2D{
+impl <'a> BoundaryCondition2D for CartesianDataFrame2D<Real>{
     /// Fill the ghost nodes of the CartesianDataFrame based on BcType
     fn fill_bc (&mut self) {
         for i_comp in 0..self.n_comp{
@@ -495,8 +497,9 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D{
             }
         }
     }
-    
+}   
 
+impl<T: Clone+Default> GhostCells for CartesianDataFrame2D<T>{
     /// Determines if the cell at (i,j) is a valid cell (returns true) or a ghost
     /// cell (returns false)
     /// This will eventually be depricated in favour of the cell_type element in the data structure
@@ -515,13 +518,13 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D{
 }
 
 /// Immutable iterator for `CartesianDataFrame`.
-pub struct CartesianDataFrame2DIter<'a> {
-    df: &'a CartesianDataFrame2D,
+pub struct CartesianDataFrame2DIter<'a, T> {
+    df: &'a CartesianDataFrame2D<T>,
     current_indx: usize,
 }
 
-impl <'a> Iterator for CartesianDataFrame2DIter<'a>{
-    type Item = &'a Real;
+impl <'a, T> Iterator for CartesianDataFrame2DIter<'a, T>{
+    type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
         // progress the current index to skip ghost cells
@@ -550,12 +553,12 @@ impl <'a> Iterator for CartesianDataFrame2DIter<'a>{
 
 
 /// Mutable iterator for `CartesianDataFrame`.
-pub struct CartesianDataFrame2DIterMut<'a> {
-    df: &'a mut CartesianDataFrame2D,
+pub struct CartesianDataFrame2DIterMut<'a, T> {
+    df: &'a mut CartesianDataFrame2D<T>,
     current_indx: usize,
 }
-impl <'a> Iterator for CartesianDataFrame2DIterMut<'a> {
-    type Item = &'a mut Real;
+impl <'a, T> Iterator for CartesianDataFrame2DIterMut<'a, T> {
+    type Item = &'a mut T;
 
     // this is a safe function wrapping unsafe code. Rust cannot guarantee that it is safe, but
     // in practice it can be, and I'm pretty sure that it should be safe for everything we will 
@@ -589,9 +592,9 @@ impl <'a> Iterator for CartesianDataFrame2DIterMut<'a> {
 }
 
 
-impl <'a> IntoIterator for &'a mut CartesianDataFrame2D{
-    type Item = &'a mut Real;
-    type IntoIter = CartesianDataFrame2DIterMut<'a>;
+impl <'a, T> IntoIterator for &'a mut CartesianDataFrame2D<T>{
+    type Item = &'a mut T;
+    type IntoIter = CartesianDataFrame2DIterMut<'a,T>;
 
     fn into_iter(self) -> Self::IntoIter{
         Self::IntoIter {
@@ -601,9 +604,9 @@ impl <'a> IntoIterator for &'a mut CartesianDataFrame2D{
     }
 }
 
-impl<'a> IntoIterator for &'a CartesianDataFrame2D{
-    type Item = &'a Real;
-    type IntoIter = CartesianDataFrame2DIter<'a>;
+impl<'a, T> IntoIterator for &'a CartesianDataFrame2D<T>{
+    type Item = &'a T;
+    type IntoIter = CartesianDataFrame2DIter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter{
         Self::IntoIter{
@@ -615,24 +618,24 @@ impl<'a> IntoIterator for &'a CartesianDataFrame2D{
 
 
 /// Struct to mutably iterate over a data frame, with the current index and the data itself
-pub struct EnumerateIndex<'a>{
-    iter: CartesianDataFrame2DIterMut<'a>,
+pub struct EnumerateIndex<'a, T>{
+    iter: CartesianDataFrame2DIterMut<'a, T>,
 }
 
 /// Turns `CartesianDataFrameIter` into a mutable iterator which enumerates over the current index
-pub trait IndexEnumerable <'a> {
-    fn enumerate_index(self) -> EnumerateIndex<'a>;
+pub trait IndexEnumerable <'a, T> {
+    fn enumerate_index(self) -> EnumerateIndex<'a, T>;
 }
-impl <'a> IndexEnumerable <'a> for CartesianDataFrame2DIterMut<'a> {
-    fn enumerate_index(self) -> EnumerateIndex<'a> {
+impl <'a,T> IndexEnumerable <'a, T> for CartesianDataFrame2DIterMut<'a,T> {
+    fn enumerate_index(self) -> EnumerateIndex<'a,T> {
         EnumerateIndex{
             iter: self,
         }
     }
 }
 
-impl <'a> Iterator for EnumerateIndex<'a> {
-    type Item = ((isize, isize, usize), &'a mut Real);
+impl <'a,T: Clone+Default> Iterator for EnumerateIndex<'a,T> {
+    type Item = ((isize, isize, usize), &'a mut T);
 
     fn next(&mut self) -> Option<Self::Item>{
         let next_item = self.iter.next();
@@ -649,24 +652,24 @@ impl <'a> Iterator for EnumerateIndex<'a> {
 }
 
 /// Structure to mutably iterate over data, giving both the position of the data, and the data itself
-pub struct EnumeratePos<'a>{
-    iter: CartesianDataFrame2DIterMut<'a>,
+pub struct EnumeratePos<'a,T>{
+    iter: CartesianDataFrame2DIterMut<'a,T>,
 }
 
 /// Turns `CartesianDataFrameIter` into a mutable iterator which enumerates the position of the data
-pub trait PosEnumerable <'a> {
-    fn enumerate_pos(self) -> EnumeratePos<'a>;
+pub trait PosEnumerable <'a,T> {
+    fn enumerate_pos(self) -> EnumeratePos<'a,T>;
 }
-impl <'a> PosEnumerable <'a> for CartesianDataFrame2DIterMut<'a> {
-    fn enumerate_pos(self) -> EnumeratePos<'a> {
+impl <'a,T> PosEnumerable <'a,T> for CartesianDataFrame2DIterMut<'a,T> {
+    fn enumerate_pos(self) -> EnumeratePos<'a,T> {
         EnumeratePos{
             iter: self,
         }
     }
 }
 
-impl <'a> Iterator for EnumeratePos<'a> {
-    type Item = ((Real, Real, usize), &'a mut Real);
+impl <'a,T: Clone+Default> Iterator for EnumeratePos<'a,T> {
+    type Item = ((Real, Real, usize), &'a mut T);
 
     fn next(&mut self) -> Option<Self::Item>{
         let next_item = self.iter.next();
@@ -687,10 +690,10 @@ impl <'a> Iterator for EnumeratePos<'a> {
 }
 
 // multiplication of owned data frame by a real number
-impl std::ops::Mul<CartesianDataFrame2D> for Real {
-    type Output = CartesianDataFrame2D;
+impl std::ops::Mul<CartesianDataFrame2D<Real>> for Real {
+    type Output = CartesianDataFrame2D<Real>;
 
-    fn mul(self, rhs: CartesianDataFrame2D) -> Self::Output {
+    fn mul(self, rhs: CartesianDataFrame2D<Real>) -> Self::Output {
         let mut result = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost);
         for (i, vals) in result.data.iter_mut().enumerate(){
             *vals = self * rhs.data[i];
@@ -702,10 +705,10 @@ impl std::ops::Mul<CartesianDataFrame2D> for Real {
 /// multiplication of borrowed data frame by real
 /// returns a new owned data frame
 /// takes the boundary conditions of the rhs data frame
-impl std::ops::Mul<&CartesianDataFrame2D> for Real {
-    type Output = CartesianDataFrame2D;
+impl std::ops::Mul<&CartesianDataFrame2D<Real>> for Real {
+    type Output = CartesianDataFrame2D<Real>;
 
-    fn mul(self, rhs: &CartesianDataFrame2D) -> Self::Output {
+    fn mul(self, rhs: &CartesianDataFrame2D<Real>) -> Self::Output {
         let mut result = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost);
         for (i, vals) in result.data.iter_mut().enumerate(){
             *vals = self * rhs.data[i];
@@ -717,10 +720,10 @@ impl std::ops::Mul<&CartesianDataFrame2D> for Real {
 /// addition of two borrowed data frames
 /// returns a new owned data frame
 /// takes the boundary conditions of the rhs data frame
-impl std::ops::Add<&CartesianDataFrame2D> for &CartesianDataFrame2D {
-    type Output = CartesianDataFrame2D;
+impl std::ops::Add<&CartesianDataFrame2D<Real>> for &CartesianDataFrame2D<Real> {
+    type Output = CartesianDataFrame2D<Real>;
 
-    fn add(self, rhs: &CartesianDataFrame2D) -> Self::Output {
+    fn add(self, rhs: &CartesianDataFrame2D<Real>) -> Self::Output {
         let mut sum = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost);
         for (i, vals) in sum.data.iter_mut().enumerate() {
             *vals = self.data[i] + rhs.data[i];
@@ -732,10 +735,10 @@ impl std::ops::Add<&CartesianDataFrame2D> for &CartesianDataFrame2D {
 /// multiplication of two borrowed data frames
 /// returns a new owned data frame
 /// takes the boundary conditions of the rhs data frame
-impl std::ops::Mul<&CartesianDataFrame2D> for &CartesianDataFrame2D {
-    type Output = CartesianDataFrame2D;
+impl std::ops::Mul<&CartesianDataFrame2D<Real>> for &CartesianDataFrame2D<Real> {
+    type Output = CartesianDataFrame2D<Real>;
 
-    fn mul(self, rhs: &CartesianDataFrame2D) -> Self::Output {
+    fn mul(self, rhs: &CartesianDataFrame2D<Real>) -> Self::Output {
         let mut result = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost);
         for (i, vals) in result.data.iter_mut().enumerate(){
             *vals = self.data[i] * rhs.data[i];
@@ -751,15 +754,15 @@ impl std::ops::Mul<&CartesianDataFrame2D> for &CartesianDataFrame2D {
 
 
 /// mutable iterator for `CartesianDataFrame`.
-pub struct CartesianDataFrameGhostIter<'a> {
-    df: &'a mut CartesianDataFrame2D,
+pub struct CartesianDataFrameGhostIter<'a,T> {
+    df: &'a mut CartesianDataFrame2D<T>,
     current_indx: usize,
 }
 
 
 
-impl <'a> Iterator for CartesianDataFrameGhostIter<'a> {
-    type Item = &'a mut Real;
+impl <'a,T: Clone+BoundaryCondition2D+Default> Iterator for CartesianDataFrameGhostIter<'a,T> {
+    type Item = &'a mut T;
 
     // this is a safe function wrapping unsafe code. Rust cannot guarantee that it is safe, but
     // in practice it can be, and I'm pretty sure that it should be safe for everything we will 
@@ -790,12 +793,12 @@ impl <'a> Iterator for CartesianDataFrameGhostIter<'a> {
     }
 }
 
-pub trait GhostIterator <'a> {
-    fn ghost(self) -> CartesianDataFrameGhostIter<'a>;
+pub trait GhostIterator <'a,T> {
+    fn ghost(self) -> CartesianDataFrameGhostIter<'a,T>;
 }
 
-impl <'a> GhostIterator <'a> for CartesianDataFrame2DIterMut<'a> {
-    fn ghost(self) -> CartesianDataFrameGhostIter<'a> {
+impl <'a,T> GhostIterator <'a,T> for CartesianDataFrame2DIterMut<'a,T> {
+    fn ghost(self) -> CartesianDataFrameGhostIter<'a,T> {
         CartesianDataFrameGhostIter{
             current_indx: 0,
             df: self.df,
@@ -805,25 +808,25 @@ impl <'a> GhostIterator <'a> for CartesianDataFrame2DIterMut<'a> {
 
 
 /// Struct to iterate over a data frame, with the current index and the data itself
-pub struct EnumerateGhostIndex<'a>{
-    iter: CartesianDataFrameGhostIter<'a>,
+pub struct EnumerateGhostIndex<'a,T>{
+    iter: CartesianDataFrameGhostIter<'a,T>,
 }
 
 /// Turns `CartesianDataFrameIter` into an iterator which enumerates over the current index
-pub trait GhostIndexEnumerable <'a> {
-    fn enumerate_index(self) -> EnumerateGhostIndex<'a>;
+pub trait GhostIndexEnumerable <'a,T> {
+    fn enumerate_index(self) -> EnumerateGhostIndex<'a,T>;
 }
 
-impl <'a> GhostIndexEnumerable <'a> for CartesianDataFrameGhostIter<'a> {
-    fn enumerate_index(self) -> EnumerateGhostIndex<'a> {
+impl <'a,T> GhostIndexEnumerable <'a,T> for CartesianDataFrameGhostIter<'a,T> {
+    fn enumerate_index(self) -> EnumerateGhostIndex<'a,T> {
         EnumerateGhostIndex{
             iter: self,
         }
     }
 }
 
-impl <'a> Iterator for EnumerateGhostIndex<'a> {
-    type Item = ((isize, isize, usize), &'a mut Real);
+impl <'a,T: Clone + BoundaryCondition2D + Default> Iterator for EnumerateGhostIndex<'a,T> {
+    type Item = ((isize, isize, usize), &'a mut T);
 
     fn next(&mut self) -> Option<Self::Item>{
         let next_item = self.iter.next();
@@ -854,9 +857,10 @@ mod tests{
         // 2D
         {
             let m2 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3, 3]));
-            let mut df2 = CartesianDataFrame2D::new_from(&m2, BCs::empty(), 1, 1);
+            let mut df2 = CartesianDataFrame2D::<Real>::new_from(&m2, BCs::empty(), 1, 1);
             df2.fill_ic(|x,y,_| x + y);
             
+            println!("{:?}", df2);
 
 
             let mut df2_iter = df2.into_iter();
@@ -939,7 +943,7 @@ mod tests{
     #[test]
     fn node_type () {
         let m2 = CartesianMesh2D::new(RealVec2([0.0,0.0]), RealVec2([6.0, 6.0]), UIntVec2([3,3]));
-        let df2 = CartesianDataFrame2D::new_from(&m2, BCs::empty(), 1, 1);
+        let df2 = CartesianDataFrame2D::<Real>::new_from(&m2, BCs::empty(), 1, 1);
 
         assert_eq!(
             df2.cell_type,

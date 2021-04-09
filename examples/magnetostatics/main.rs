@@ -41,7 +41,7 @@ fn main() {
     ]);
 
     // create the data frame
-    let mut psi = CartesianDataFrame2D::new_from(&mesh, bc.clone(), 1, 1);
+    let mut psi = CartesianDataFrame2D::<Real>::new_from(&mesh, bc.clone(), 1, 1);
     psi.fill_ic(|x,y,_| -> Real {
         -conf.model.h_far[0]/mesh.dx[0]*x - conf.model.h_far[1]/mesh.dx[1]*y
         

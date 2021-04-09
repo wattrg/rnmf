@@ -33,6 +33,18 @@ pub enum BcType {
     Neumann(Real),
 }
 
+// /// specifies the boundary condition for each inner component of the data
+// #[derive(Debug, Clone)]
+// pub struct InnerCompBCs {
+//     pub lo: Vec<BcType>,
+//     pub hi: Vec<BcType>,
+// }
+// impl InnerCompBCs {
+//     pub fn new(lo: Vec<BcType>, hi: Vec<BcType>)->InnerCompBCs{
+//         InnerCompBCs{lo, hi,}
+//     }
+// }
+
 /// Specifies the boundary condition for each component of the data
 #[derive(Debug, Clone)]
 pub struct ComponentBCs {
@@ -42,14 +54,9 @@ pub struct ComponentBCs {
     /// Specifies the boundary condition for the upper edges
     pub hi: Vec<BcType>,
 }
-
-
 impl ComponentBCs {
     pub fn new(lo: Vec<BcType>, hi: Vec<BcType>) -> ComponentBCs{
-        ComponentBCs {
-            lo,
-            hi,
-        }
+        ComponentBCs {lo, hi,}
     }
 }
 

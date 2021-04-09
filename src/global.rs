@@ -11,13 +11,13 @@ pub enum GlobalCompare {
 }
 
 #[derive(Clone)]
-pub struct GlobalVal
+pub struct GlobalVal<T>
 {
     pub value: Real,
-    get_value: fn(&CartesianBlock)->Real,
+    get_value: fn(&CartesianBlock<T>)->Real,
 }
-impl GlobalVal{
-    pub fn calc_value(&mut self, dfs: &CartesianBlock)
+impl <T> GlobalVal<T>{
+    pub fn calc_value(&mut self, dfs: &CartesianBlock<T>)
     {
         self.value = (self.get_value)(dfs);
     }

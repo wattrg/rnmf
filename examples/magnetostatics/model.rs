@@ -57,19 +57,19 @@ impl UserConfig for UserModel{
     }
 }
 
-pub fn output_callbacks()-> crate::io::OutputCallBackHashMap{
+pub fn output_callbacks()-> crate::io::OutputCallBackHashMap<Real>{
     // set up hash map for outputting variables
-    let mut output: crate::io::OutputCallBackHashMap = HashMap::new();
+    let mut output: crate::io::OutputCallBackHashMap<Real> = HashMap::new();
     output.insert("psi".to_string(), get_psi);
     output.insert("h".to_string(), get_h);
     output
 }
 
-pub fn get_psi(data: &CartesianDataFrame2D) -> Result<VtkData, String> {
+pub fn get_psi(data: &CartesianDataFrame2D<Real>) -> Result<VtkData<f64>, String> {
     Ok(VtkData::try_from(data.clone())?)
 }
 
-pub fn get_h(data: &CartesianDataFrame2D) -> Result<VtkData, String> {
+pub fn get_h(data: &CartesianDataFrame2D<Real>) -> Result<VtkData<Real>, String> {
     let mut h_field = CartesianDataFrame2D::new_from(&data.underlying_mesh, data.bc.clone(), 2, data.n_ghost);
     for ((i,j,n), h) in &mut h_field.iter_mut().enumerate_index(){
         match n {

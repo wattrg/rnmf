@@ -5,7 +5,7 @@ use crate::config::Config;
 use super::model::UserModel;
 use rnmf::{Real, RealVec2};
 
-fn get_laplace(phi: &CartesianDataFrame2D, model: &Config<UserModel>) -> CartesianDataFrame2D {
+fn get_laplace(phi: &CartesianDataFrame2D<Real>, model: &Config<UserModel>) -> CartesianDataFrame2D<Real> {
     let bc = BCs::new(
         vec![
             ComponentBCs::new(
@@ -29,7 +29,7 @@ fn get_laplace(phi: &CartesianDataFrame2D, model: &Config<UserModel>) -> Cartesi
     lap
 }
 
-pub fn get_source(phi: &CartesianDataFrame2D, config: &Config<UserModel>) -> CartesianDataFrame2D {
+pub fn get_source(phi: &CartesianDataFrame2D<Real>, config: &Config<UserModel>) -> CartesianDataFrame2D<Real> {
     let mut source = CartesianDataFrame2D::new_from(&phi.underlying_mesh, phi.bc.clone(), 1, 1);
     for ((i,j,_), src) in &mut source.iter_mut().enumerate_index(){
         *src = -(1.0 - 1.0/config.model.relax)/mu(i,j,&phi.underlying_mesh.dx, config);
@@ -58,9 +58,9 @@ pub fn mu(i: isize, j: isize, dx: &RealVec2, config: &Config<UserModel>) -> Real
 }
 
 
-pub fn solve_poisson(psi_init: &CartesianDataFrame2D, 
-                     rhs: &CartesianDataFrame2D, 
-                     config: &Config<UserModel>) -> CartesianDataFrame2D{
+pub fn solve_poisson(psi_init: &CartesianDataFrame2D<Real>, 
+                     rhs: &CartesianDataFrame2D<Real>, 
+                     config: &Config<UserModel>) -> CartesianDataFrame2D<Real>{
 
     let mut psi = psi_init.clone();
     let dx2 = psi.underlying_mesh.dx[0].powf(2.0);
@@ -85,7 +85,7 @@ pub fn solve_poisson(psi_init: &CartesianDataFrame2D,
 
 }
 
-pub fn sum(psi: &CartesianDataFrame2D)->Real{
+pub fn sum(psi: &CartesianDataFrame2D<Real>)->Real{
     let mut psi_sum: Real = 0.0;
     for val in psi.iter(){
         psi_sum += val.abs();
