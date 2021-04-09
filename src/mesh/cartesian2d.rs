@@ -245,7 +245,7 @@ pub struct CartesianBlock {
     name: Option<String>,
 
     /// The underlying mesh for this block
-    mesh: CartesianMesh2D,
+    mesh: Rc<CartesianMesh2D>,
 
     /// The dataframes for the block, stored in a hashmap so they can be identified by a name
     dfs: DfHashMap,
