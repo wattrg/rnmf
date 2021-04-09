@@ -239,22 +239,22 @@ pub struct CartesianDataFrame2D{
 #[derive(Debug, Clone)]
 pub struct CartesianBlock {
     /// An id to identify the block, and will be used for identifying neighbouring blocks
-    id: usize,
+    pub id: usize,
 
     /// Optional name for the block, to make identifying it easier for people
-    name: Option<String>,
+    pub name: Option<String>,
 
     /// The underlying mesh for this block
-    mesh: Rc<CartesianMesh2D>,
+    pub mesh: Rc<CartesianMesh2D>,
 
     /// The dataframes for the block, stored in a hashmap so they can be identified by a name
-    dfs: DfHashMap,
+    pub dfs: DfHashMap,
 
     /// The blocks stored on the low side of the block. None if there is no block
-    lo_connectivity: [Option<usize>; 2],
+    pub lo_connectivity: [Option<usize>; 2],
 
     /// The blocks stored on the high side of the block. None if there is no block
-    hi_connectivity: [Option<usize>; 2],
+    pub hi_connectivity: [Option<usize>; 2],
 }
 
 // impl CartesianBlock {
