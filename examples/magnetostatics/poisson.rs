@@ -3,7 +3,7 @@ use super::mesh::cartesian2d::*;
 use super::boundary_conditions::{BcType, BCs, ComponentBCs};
 use crate::config::Config;
 use super::model::UserModel;
-use rnmf::Real;
+use rnmf::{Real, RealVec2};
 
 fn get_laplace(phi: &CartesianDataFrame2D, model: &Config<UserModel>) -> CartesianDataFrame2D {
     let bc = BCs::new(
@@ -38,7 +38,7 @@ pub fn get_source(phi: &CartesianDataFrame2D, config: &Config<UserModel>) -> Car
 }
 
 
-fn is_inside(i: isize, j: isize, dx: &[Real], config: &Config<UserModel>) -> bool{
+fn is_inside(i: isize, j: isize, dx: &RealVec2, config: &Config<UserModel>) -> bool{
     let x_pos = (i as Real + 0.5) * dx[0];
     let y_pos = (j as Real + 0.5) * dx[1];
 
@@ -48,7 +48,7 @@ fn is_inside(i: isize, j: isize, dx: &[Real], config: &Config<UserModel>) -> boo
     x_dist * x_dist + y_dist * y_dist <= config.model.bubble_radius*config.model.bubble_radius
 }
 
-pub fn mu(i: isize, j: isize, dx: &[Real], config: &Config<UserModel>) -> Real {
+pub fn mu(i: isize, j: isize, dx: &RealVec2, config: &Config<UserModel>) -> Real {
     if is_inside(i, j, dx, config){
         config.model.mu[0]
     }

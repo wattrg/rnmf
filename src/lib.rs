@@ -48,10 +48,40 @@ impl std::ops::Index<usize> for RealVec2{
         &self.0[indx]
     }
 }
+impl std::ops::IndexMut<usize> for RealVec2{
+    fn index_mut(&mut self, indx: usize) -> &mut Self::Output {
+        &mut self.0[indx]
+    }
+}
+impl std::ops::Deref for RealVec2{
+    type Target = [Real; 2];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 /// Array containing three real numbers
 #[derive(Debug, Clone, Default)]
 pub struct RealVec3(pub [Real; 3]);
+impl std::ops::Index<usize> for RealVec3{
+    type Output = Real;
+    fn index(&self, indx: usize)->&Self::Output{
+        &self.0[indx]
+    }
+}
+impl std::ops::IndexMut<usize> for RealVec3{
+    fn index_mut(&mut self, indx: usize) -> &mut Self::Output {
+        &mut self.0[indx]
+    }
+}
+impl std::ops::Deref for RealVec3{
+    type Target = [Real; 3];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct UIntVec1(pub [usize; 1]);
@@ -59,16 +89,70 @@ pub struct UIntVec1(pub [usize; 1]);
 /// Array containing two unsigned integers
 #[derive(Debug, Clone, Default)]
 pub struct UIntVec2(pub [usize; 2]);
+impl std::ops::Deref for UIntVec2{
+    type Target = [usize; 2];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::iter::FromIterator<usize> for UIntVec2{
+    fn from_iter<I: IntoIterator<Item=usize>>(iter: I) -> Self {
+        let mut result = UIntVec2([0, 0]);
+
+        for (i, value) in iter.into_iter().enumerate(){
+            result[i] = value;
+        } 
+        result
+    }
+}
 impl std::ops::Index<usize> for UIntVec2{
     type Output = usize;
     fn index(&self, indx: usize)->&Self::Output{
         &self.0[indx]
     }
 }
+impl std::ops::IndexMut<usize> for UIntVec2{
+    fn index_mut(&mut self, indx: usize) -> &mut Self::Output {
+        &mut self.0[indx]
+    }
+}
+
+
 
 /// Array containing three unsigned integers
 #[derive(Debug, Clone, Default)]
 pub struct UIntVec3(pub [usize; 3]);
+impl std::ops::Deref for UIntVec3{
+    type Target = [usize; 3];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::iter::FromIterator<usize> for UIntVec3{
+    fn from_iter<I: IntoIterator<Item=usize>>(iter: I) -> Self {
+        let mut result = UIntVec3([0, 0, 0]);
+
+        for (i, value) in iter.into_iter().enumerate(){
+            result[i] = value;
+        } 
+        result
+    }
+}
+impl std::ops::Index<usize> for UIntVec3{
+    type Output = usize;
+    fn index(&self, indx: usize)->&Self::Output{
+        &self.0[indx]
+    }
+}
+impl std::ops::IndexMut<usize> for UIntVec3{
+    fn index_mut(&mut self, indx: usize) -> &mut Self::Output {
+        &mut self.0[indx]
+    }
+}
+
+
 
 #[derive(Debug, Clone, Default)]
 pub struct IntVec1(pub [isize; 1]);
@@ -76,16 +160,47 @@ pub struct IntVec1(pub [isize; 1]);
 /// Slice containing two integers
 #[derive(Debug, Clone, Default)]
 pub struct IntVec2(pub [isize; 2]);
+impl std::ops::Deref for IntVec2{
+    type Target = [isize; 2];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 impl std::ops::Index<usize> for IntVec2{
     type Output = isize;
     fn index(&self, indx: usize)->&Self::Output{
         &self.0[indx]
     }
 }
+impl std::ops::IndexMut<usize> for IntVec2{
+    fn index_mut(&mut self, indx: usize) -> &mut Self::Output {
+        &mut self.0[indx]
+    }
+}
 
 /// Slice containing three integers
 #[derive(Debug, Clone, Default)]
 pub struct IntVec3(pub [isize; 3]);
+impl std::ops::Deref for IntVec3{
+    type Target = [isize; 3];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::Index<usize> for IntVec3{
+    type Output = isize;
+    fn index(&self, indx: usize)->&Self::Output{
+        &self.0[indx]
+    }
+}
+impl std::ops::IndexMut<usize> for IntVec3{
+    fn index_mut(&mut self, indx: usize) -> &mut Self::Output {
+        &mut self.0[indx]
+    }
+}
+
 
 
 

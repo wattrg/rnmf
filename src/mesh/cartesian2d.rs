@@ -7,7 +7,7 @@
 
 use crate::boundary_conditions::*;
 use std::rc::Rc;
-use crate::Real;
+use crate::{Real, RealVec2, UIntVec2};
 use std::collections::HashMap;
 use super::DataFrameContainer;
 
@@ -20,16 +20,16 @@ pub struct CartesianMesh2D {
     pub node_pos: Vec<Real>,
 
     /// The lower corner of the mesh
-    pub lo: [Real; 2],
+    pub lo: RealVec2,
 
     /// The upper corner of the mesh
-    pub hi: [Real; 2],
+    pub hi: RealVec2,
 
     /// The number of cells in nodes in each direction
-    pub n : [usize; 2],
+    pub n : UIntVec2,
 
     /// The distance between each node in each
-    pub dx: [Real; 2],
+    pub dx: RealVec2,
 
     /// The number of dimensions
     pub dim: usize,
@@ -51,12 +51,13 @@ trait Indexing{
 impl CartesianMesh2D {
     /// Generate new CartesianMesh from the lo and high corner, 
     /// and the number of nodes
-    pub fn new(lo: [Real; 2], hi: [Real; 2], n: [usize; 2]) -> Rc<CartesianMesh2D>
+    pub fn new(lo: RealVec2, hi: RealVec2, n: UIntVec2) -> Rc<CartesianMesh2D>
     {
         let mut dx = [0.0; 2];
         for i_dim in 0..2_usize{
             dx[i_dim] = (hi[i_dim] - lo[i_dim])/(n[i_dim] as Real);
         }
+        
 
         // calculate the capacity of the vector required to store all the node positions
         let n_nodes = n[0]*n[1]*2;
@@ -70,7 +71,7 @@ impl CartesianMesh2D {
             lo,
             hi,
             n,
-            dx,
+            dx: RealVec2(dx),
             node_pos,
             dim: 2,
             n_nodes,
@@ -95,7 +96,7 @@ impl CartesianMesh2D {
 
 /// function to convert a multi-dimensional coordinate into a single dimension coordinate
 fn get_flat_index(i: isize, j: isize, n: usize, 
-            dimension: &[usize], ng: usize) -> usize {
+            dimension: &UIntVec2, ng: usize) -> usize {
 
     let mut p = i + ng as isize;
     p += dimension[0] as isize * (j + ng as isize) 
@@ -106,7 +107,7 @@ fn get_flat_index(i: isize, j: isize, n: usize,
 }
 
 /// Converts (3+1)D index into a 1D (flattened) index
-fn get_ij_from_p(p: usize, dimension: &[usize], n_nodes: usize, ng: usize) 
+fn get_ij_from_p(p: usize, dimension: &UIntVec2, n_nodes: usize, ng: usize) 
                                                         -> Option<(isize, isize, usize)>{
     if p >= n_nodes {
         Option::None
@@ -215,7 +216,7 @@ pub struct CartesianDataFrame2D{
     /// The number of ghost nodes, added to each side of the underlying `CartesianMesh`
     pub n_ghost: usize,
 
-    pub n_grown: Vec<usize>,
+    pub n_grown: UIntVec2,
 
     /// Reference to the underlying `CartesianMesh`
     pub underlying_mesh: Rc<CartesianMesh2D>,
@@ -299,7 +300,7 @@ impl CartesianDataFrame2D {
         let n_nodes = ((m.n[0] + 2*n_ghost) * (m.n[1] + 2*n_ghost))*n_comp;
 
         // calculate grown size of the data frame
-        let n_grown: Vec<usize> = m.n.clone().iter().map(|n| n + 2*n_ghost).collect();
+        let n_grown: UIntVec2 = m.n.clone().iter().map(|n| n + 2*n_ghost).collect();
 
         // calculate cell_type
         let mut cell_type = vec![CellType::Valid; n_nodes];
@@ -852,7 +853,7 @@ mod tests{
         
         // 2D
         {
-            let m2 = CartesianMesh2D::new([0.0, 0.0], [6.0, 6.0], [3, 3]);
+            let m2 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3, 3]));
             let mut df2 = CartesianDataFrame2D::new_from(&m2, BCs::empty(), 1, 1);
             df2.fill_ic(|x,y,_| x + y);
             
@@ -887,7 +888,7 @@ mod tests{
     #[test]
     fn mesh_iterator () {
 
-        let m2 = CartesianMesh2D::new([0.0, 0.0], [6.0, 6.0], [3, 3]);
+        let m2 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3, 3]));
         let mut m2_iter = m2.into_iter();
         assert_eq!(m2_iter.next().unwrap(), vec![& 1.0, & 1.0]);
         assert_eq!(m2_iter.next().unwrap(), vec![& 3.0, & 1.0]);
@@ -904,7 +905,7 @@ mod tests{
     #[test]
     fn indexing () {
 
-        let m2 = CartesianMesh2D::new([0.0,0.0], [6.0,6.0], [3,3]);
+        let m2 = CartesianMesh2D::new(RealVec2([0.0,0.0]), RealVec2([6.0,6.0]), UIntVec2([3,3]));
         assert_eq!(m2.get_ij(16).unwrap(), (1,2,1));
         assert_eq!(m2.get_ij(40), Option::None);
         assert_eq!(m2.index(2,1,1), &3.0);
@@ -914,7 +915,7 @@ mod tests{
     #[test]
     fn node_pos () {
 
-        let m2 = CartesianMesh2D::new([0.0, 0.0], [10.0, 10.0], [5,5]);
+        let m2 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([10.0, 10.0]), UIntVec2([5,5]));
         assert_eq!(
             m2.node_pos,
             vec![
@@ -937,7 +938,7 @@ mod tests{
 
     #[test]
     fn node_type () {
-        let m2 = CartesianMesh2D::new([0.0,0.0], [6.0, 6.0], [3,3]);
+        let m2 = CartesianMesh2D::new(RealVec2([0.0,0.0]), RealVec2([6.0, 6.0]), UIntVec2([3,3]));
         let df2 = CartesianDataFrame2D::new_from(&m2, BCs::empty(), 1, 1);
 
         assert_eq!(

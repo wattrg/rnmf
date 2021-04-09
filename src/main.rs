@@ -23,7 +23,7 @@ fn main()  {
     );
 
     // create the mesh 
-    let u1 = CartesianMesh2D::new([0.0, 0.0], [6.0, 6.0], [3, 3]);
+    let u1 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3, 3]));
    
     // create some variables on top of the mesh
     let mut variable1 = CartesianDataFrame2D::new_from(&u1, bc.clone(), 2, 1);

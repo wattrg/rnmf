@@ -22,9 +22,9 @@ fn main() {
 
     // create the mesh 
     let mesh = CartesianMesh2D::new(
-        [0.0, 0.0],                                   // lo corner
-        [conf.geom.length[0], conf.geom.length[1]],   // hi corner
-        [conf.geom.n_cells[0], conf.geom.n_cells[1]]  // number of cells
+        RealVec2([0.0, 0.0]),                                   // lo corner
+        RealVec2([conf.geom.length[0], conf.geom.length[1]]),   // hi corner
+        UIntVec2([conf.geom.n_cells[0], conf.geom.n_cells[1]])  // number of cells
     );
 
 
