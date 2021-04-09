@@ -75,7 +75,7 @@ pub fn init<T: 'static>(args: Vec<String>, user_model: T, out_cb:fn()->OutputCal
     }
 
 
-    if args.is_empty() {
+    if args.len() <= 1 {
         println!("{} Lua configuration script not given.", "Error:".red());
         panic!();
     }
