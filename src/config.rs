@@ -74,10 +74,12 @@ pub fn init<T: 'static>(args: Vec<String>, user_model: T, out_cb:fn()->OutputCal
         println!("using double precision");
     }
 
+
     if args.is_empty() {
-        println!("{} Location of lua configuration script not given.", "Error:".red());
+        println!("{} Lua configuration script not given.", "Error:".red());
         panic!();
     }
+    
 
     Ok((read_lua(args[1].clone(), user_model)?, out_cb()))
 

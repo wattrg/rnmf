@@ -6,7 +6,15 @@ use super::model::UserModel;
 use rnmf::Real;
 
 fn get_laplace(phi: &CartesianDataFrame2D, model: &Config<UserModel>) -> CartesianDataFrame2D {
-    let mut lap = CartesianDataFrame2D::new_from(&phi.underlying_mesh, 1, 1);
+    let bc = BCs::new(
+        vec![
+            ComponentBCs::new(
+                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(0.0)],
+                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(0.0)]
+            )
+        ]
+    );
+    let mut lap = CartesianDataFrame2D::new_from(&phi.underlying_mesh, bc, 1, 1);
     let dx = &phi.underlying_mesh.dx;
 
     for ((i,j,_), lap) in lap.iter_mut().enumerate_index(){
@@ -17,20 +25,12 @@ fn get_laplace(phi: &CartesianDataFrame2D, model: &Config<UserModel>) -> Cartesi
                         - phi[(i  ,j  ,0)]*(mu(i+1,j  ,dx,model) + mu(i-1,j,dx,model)+mu(i,j+1,dx,model)+mu(i,j-1,dx,model)+4.0*mu(i,j,dx,model))/2.0;
     }
     
-    let bc = BCs::new(
-        vec![
-            ComponentBCs::new(
-                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(0.0)],
-                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(0.0)]
-            )
-        ]
-    );
-    lap.fill_bc(&bc);
+    lap.fill_bc();
     lap
 }
 
 pub fn get_source(phi: &CartesianDataFrame2D, config: &Config<UserModel>) -> CartesianDataFrame2D {
-    let mut source = CartesianDataFrame2D::new_from(&phi.underlying_mesh, 1, 1);
+    let mut source = CartesianDataFrame2D::new_from(&phi.underlying_mesh, phi.bc.clone(), 1, 1);
     for ((i,j,_), src) in &mut source.iter_mut().enumerate_index(){
         *src = -(1.0 - 1.0/config.model.relax)/mu(i,j,&phi.underlying_mesh.dx, config);
     }
@@ -60,8 +60,7 @@ pub fn mu(i: isize, j: isize, dx: &[Real], config: &Config<UserModel>) -> Real {
 
 pub fn solve_poisson(psi_init: &CartesianDataFrame2D, 
                      rhs: &CartesianDataFrame2D, 
-                     config: &Config<UserModel>,
-                     bc: &BCs) -> CartesianDataFrame2D{
+                     config: &Config<UserModel>) -> CartesianDataFrame2D{
 
     let mut psi = psi_init.clone();
     let dx2 = psi.underlying_mesh.dx[0].powf(2.0);
@@ -80,7 +79,7 @@ pub fn solve_poisson(psi_init: &CartesianDataFrame2D,
                                  gamma * (psi[(i,j+1,0)] + psi[(i,j-1,0)]);
             }
         }
-        psi.fill_bc(&bc);
+        psi.fill_bc();
     }
     psi
 

@@ -11,17 +11,7 @@ fn main()  {
         false => panic!("please provide the lua configuration file")
     }
 
-    // create the mesh 
-    let u1 = CartesianMesh2D::new([0.0, 0.0], [6.0, 6.0], [3, 3]);
-   
-    // create some variables on top of the mesh
-    let mut variable1 = CartesianDataFrame2D::new_from(&u1, 2, 1);
-    let mut variable2 = CartesianDataFrame2D::new_from(&u1, 1, 1);
-
-    // fill the initial conditions
-    variable1.fill_ic(|x,y,n| x * y * (n + 1) as Real);
-    variable2.fill_ic(|x,y,_| x + y);
-
+    // define the boundary conditions
     let bc = BCs::new(vec![
         ComponentBCs::new(
                 // x direction
@@ -32,7 +22,19 @@ fn main()  {
         )]
     );
 
-    variable2.fill_bc(&bc);
+    // create the mesh 
+    let u1 = CartesianMesh2D::new([0.0, 0.0], [6.0, 6.0], [3, 3]);
+   
+    // create some variables on top of the mesh
+    let mut variable1 = CartesianDataFrame2D::new_from(&u1, bc.clone(), 2, 1);
+    let mut variable2 = CartesianDataFrame2D::new_from(&u1, bc, 1, 1);
+
+    // fill the initial conditions
+    variable1.fill_ic(|x,y,n| x * y * (n + 1) as Real);
+    variable2.fill_ic(|x,y,_| x + y);
+
+
+    variable2.fill_bc();
 
     // print out the variables
     println!("variable 1 = {:?}", variable1);

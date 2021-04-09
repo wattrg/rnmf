@@ -70,7 +70,7 @@ pub fn get_psi(data: &CartesianDataFrame2D) -> Result<VtkData, String> {
 }
 
 pub fn get_h(data: &CartesianDataFrame2D) -> Result<VtkData, String> {
-    let mut h_field = CartesianDataFrame2D::new_from(&data.underlying_mesh, 2, data.n_ghost);
+    let mut h_field = CartesianDataFrame2D::new_from(&data.underlying_mesh, data.bc.clone(), 2, data.n_ghost);
     for ((i,j,n), h) in &mut h_field.iter_mut().enumerate_index(){
         match n {
             0 => {

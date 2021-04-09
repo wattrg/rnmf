@@ -41,12 +41,12 @@ fn main() {
     ]);
 
     // create the data frame
-    let mut psi = CartesianDataFrame2D::new_from(&mesh, 1, 1);
+    let mut psi = CartesianDataFrame2D::new_from(&mesh, bc.clone(), 1, 1);
     psi.fill_ic(|x,y,_| -> Real {
         -conf.model.h_far[0]/mesh.dx[0]*x - conf.model.h_far[1]/mesh.dx[1]*y
         
     });
-    psi.fill_bc(&bc);
+    psi.fill_bc();
     
     
     println!("Calculating solution:");
@@ -59,11 +59,11 @@ fn main() {
     let mut iter = 0;
     while iter < conf.model.n_iter && (sum_diff > conf.model.tol){
         let source = get_source(&psi, &conf);
-        let psi_star = solve_poisson(&mut psi, &source, &conf, &bc);
+        let psi_star = solve_poisson(&mut psi, &source, &conf);
         let diff = &psi_star + &(-1.0 * &psi);
         sum_diff = sum(&diff);
         psi = &psi + &(conf.model.relax * diff);
-        psi.fill_bc(&bc);
+        psi.fill_bc();
         progress_bar.increment(1);
         iter += 1;
     }

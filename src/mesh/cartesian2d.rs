@@ -229,6 +229,9 @@ pub struct CartesianDataFrame2D{
 
     /// Distinguish between valid and ghost cells
     cell_type: Vec<CellType>,
+
+    /// The boundary conditions to apply for the data frame
+    pub bc: BCs,
 }
 
 /// For parallel computations, the entire domain is split up into segments. A CartesianBlock
@@ -289,7 +292,9 @@ impl CartesianDataFrame2D {
     /// generate new `CartesianDataFrame` from a given mesh, adding a given
     /// number of ghost nodes
     pub fn new_from(m: & Rc<CartesianMesh2D>, 
-                    n_comp: usize, n_ghost: usize) -> CartesianDataFrame2D
+                    bc: BCs,
+                    n_comp: usize, 
+                    n_ghost: usize) -> CartesianDataFrame2D
     {
         let n_nodes = ((m.n[0] + 2*n_ghost) * (m.n[1] + 2*n_ghost))*n_comp;
 
@@ -328,6 +333,7 @@ impl CartesianDataFrame2D {
             n_comp,
             n_nodes,
             cell_type,
+            bc,
         }
     }
 
@@ -403,7 +409,7 @@ impl core::ops::Index<(isize, isize, usize)> for CartesianDataFrame2D{
 
 pub trait BoundaryCondition2D {
     /// function which fills the boundary conditions
-    fn fill_bc(&mut self, bcs: &BCs);
+    fn fill_bc(&mut self);
 
     /// checks if the cell at (i,j,k) contains a valid or a ghost cell. Returns true if valid,
     /// and returns false if ghost
@@ -416,18 +422,19 @@ pub trait BoundaryCondition2D {
 
 impl <'a> BoundaryCondition2D for CartesianDataFrame2D{
     /// Fill the ghost nodes of the CartesianDataFrame based on BcType
-    fn fill_bc (&mut self, bc: &BCs) {
+    fn fill_bc (&mut self) {
         for i_comp in 0..self.n_comp{
             for i_dim in 0..2{
-                let bc_lo = &bc.bcs[i_comp].lo[i_dim];
-                let bc_hi = &bc.bcs[i_comp].hi[i_dim];
+                // cloning these is a dirty hack to avoid issues with borrowing
+                let bc_lo = &self.bc.bcs[i_comp].lo[i_dim].clone();
+                let bc_hi = &self.bc.bcs[i_comp].hi[i_dim].clone();
                 // low boundary condition
                 match bc_lo {
                     BcType::Prescribed(_values) => {
                         panic!("Prescribed boundary conditions not supported yet");
                     }
                     BcType::Neumann(gradient) => {
-                        if self.n_ghost >= 2 {panic!{"more than two ghost cells not supported for Neumann BC yet"};}
+                        if self.n_ghost >= 2 {panic!{"Two or more ghost cells not supported for Neumann BC yet"};}
                         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
                             if i_dim == 0 {
                                 self[(-1, i,i_comp)] = self[(1,i,i_comp)] - 2.0 * gradient * self.underlying_mesh.dx[i_dim];
@@ -458,7 +465,7 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D{
                     }
                 
                     BcType::Neumann(gradient) => {
-                        if self.n_ghost >= 2 {panic!{"more than two ghost cells not supported for Neumann BC yet"};}
+                        if self.n_ghost >= 2 {panic!{"Two or more ghost cells not supported for Neumann BC yet"};}
                         let hi = vec![self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
                         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
                             if i_dim == 0{
@@ -683,7 +690,7 @@ impl std::ops::Mul<CartesianDataFrame2D> for Real {
     type Output = CartesianDataFrame2D;
 
     fn mul(self, rhs: CartesianDataFrame2D) -> Self::Output {
-        let mut result = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.n_comp, rhs.n_ghost);
+        let mut result = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost);
         for (i, vals) in result.data.iter_mut().enumerate(){
             *vals = self * rhs.data[i];
         }
@@ -693,11 +700,12 @@ impl std::ops::Mul<CartesianDataFrame2D> for Real {
 
 /// multiplication of borrowed data frame by real
 /// returns a new owned data frame
+/// takes the boundary conditions of the rhs data frame
 impl std::ops::Mul<&CartesianDataFrame2D> for Real {
     type Output = CartesianDataFrame2D;
 
     fn mul(self, rhs: &CartesianDataFrame2D) -> Self::Output {
-        let mut result = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.n_comp, rhs.n_ghost);
+        let mut result = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost);
         for (i, vals) in result.data.iter_mut().enumerate(){
             *vals = self * rhs.data[i];
         }
@@ -707,11 +715,12 @@ impl std::ops::Mul<&CartesianDataFrame2D> for Real {
 
 /// addition of two borrowed data frames
 /// returns a new owned data frame
+/// takes the boundary conditions of the rhs data frame
 impl std::ops::Add<&CartesianDataFrame2D> for &CartesianDataFrame2D {
     type Output = CartesianDataFrame2D;
 
     fn add(self, rhs: &CartesianDataFrame2D) -> Self::Output {
-        let mut sum = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.n_comp, rhs.n_ghost);
+        let mut sum = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost);
         for (i, vals) in sum.data.iter_mut().enumerate() {
             *vals = self.data[i] + rhs.data[i];
         }
@@ -721,11 +730,12 @@ impl std::ops::Add<&CartesianDataFrame2D> for &CartesianDataFrame2D {
 
 /// multiplication of two borrowed data frames
 /// returns a new owned data frame
+/// takes the boundary conditions of the rhs data frame
 impl std::ops::Mul<&CartesianDataFrame2D> for &CartesianDataFrame2D {
     type Output = CartesianDataFrame2D;
 
     fn mul(self, rhs: &CartesianDataFrame2D) -> Self::Output {
-        let mut result = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.n_comp, rhs.n_ghost);
+        let mut result = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost);
         for (i, vals) in result.data.iter_mut().enumerate(){
             *vals = self.data[i] * rhs.data[i];
         }
@@ -843,7 +853,7 @@ mod tests{
         // 2D
         {
             let m2 = CartesianMesh2D::new([0.0, 0.0], [6.0, 6.0], [3, 3]);
-            let mut df2 = CartesianDataFrame2D::new_from(&m2, 1, 1);
+            let mut df2 = CartesianDataFrame2D::new_from(&m2, BCs::empty(), 1, 1);
             df2.fill_ic(|x,y,_| x + y);
             
 
@@ -928,7 +938,7 @@ mod tests{
     #[test]
     fn node_type () {
         let m2 = CartesianMesh2D::new([0.0,0.0], [6.0, 6.0], [3,3]);
-        let df2 = CartesianDataFrame2D::new_from(&m2, 1, 1);
+        let df2 = CartesianDataFrame2D::new_from(&m2, BCs::empty(), 1, 1);
 
         assert_eq!(
             df2.cell_type,

@@ -18,6 +18,7 @@ pub trait BoundaryCondition {
 
 /// Available boundary conditions
 #[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub enum BcType {
     /// user supplies a vector which is placed into ghost cells.
     /// The first entry in the vector is put in the ghost cell closest to
@@ -33,6 +34,7 @@ pub enum BcType {
 }
 
 /// Specifies the boundary condition for each component of the data
+#[derive(Debug, Clone)]
 pub struct ComponentBCs {
     /// Specifies the boundary condition for the lower edges
     pub lo: Vec<BcType>,
@@ -52,6 +54,7 @@ impl ComponentBCs {
 }
 
 /// Specifies the boundary conditions to apply for an entire data structure
+#[derive(Debug, Clone)]
 pub struct BCs {
     pub bcs: Vec<ComponentBCs>,
 }
@@ -60,6 +63,10 @@ impl BCs {
         BCs {
             bcs,
         }
+    }
+
+    pub fn empty() -> BCs{
+        BCs{bcs: Vec::new()}
     }
 }
 
