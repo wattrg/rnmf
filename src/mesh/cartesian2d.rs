@@ -315,14 +315,14 @@ impl <T: Clone+Default> CartesianDataFrame2D<T> {
             else if j >= m.n[1] as isize { *cell = CellType::North; }
 
             if i < 0 {
-                if j < 0 { *cell = CellType::SouthEast; }
-                else if j >= m.n[1] as isize { *cell = CellType::NorthEast; }
-                else { *cell = CellType::East; }
+                if j < 0 { *cell = CellType::SouthWest; }
+                else if j >= m.n[1] as isize { *cell = CellType::NorthWest; }
+                else { *cell = CellType::West; }
             }
             else if i >= m.n[0] as isize {
-                if j < 0 { *cell = CellType::SouthWest; }
-                else if j >= m.n[0] as isize { *cell = CellType::NorthWest; } 
-                else{ *cell = CellType::West; }
+                if j < 0 { *cell = CellType::SouthEast; }
+                else if j >= m.n[0] as isize { *cell = CellType::NorthEast; } 
+                else{ *cell = CellType::East; }
             }
         }
 
@@ -948,31 +948,31 @@ mod tests{
         assert_eq!(
             df2.cell_type,
             vec![
-                CellType::SouthEast,
-                CellType::South,
-                CellType::South,
-                CellType::South,
                 CellType::SouthWest,
-                CellType::East,
-                CellType::Valid,
-                CellType::Valid,
-                CellType::Valid,
+                CellType::South,
+                CellType::South,
+                CellType::South,
+                CellType::SouthEast,
                 CellType::West,
+                CellType::Valid,
+                CellType::Valid,
+                CellType::Valid,
                 CellType::East,
-                CellType::Valid,
-                CellType::Valid,
-                CellType::Valid,
                 CellType::West,
+                CellType::Valid,
+                CellType::Valid,
+                CellType::Valid,
                 CellType::East,
-                CellType::Valid,
-                CellType::Valid,
-                CellType::Valid,
                 CellType::West,
-                CellType::NorthEast,
+                CellType::Valid,
+                CellType::Valid,
+                CellType::Valid,
+                CellType::East,
+                CellType::NorthWest,
                 CellType::North,
                 CellType::North,
                 CellType::North,
-                CellType::NorthWest
+                CellType::NorthEast
             ]
         );
 
