@@ -1,6 +1,12 @@
 
-use super::mesh::cartesian2d::*;
 use super::boundary_conditions::{BcType, BCs, ComponentBCs};
+use rnmf::mesh::cartesian2d::{
+    dataframe::{
+        CartesianDataFrame2D, 
+        BoundaryCondition2D,
+        IndexEnumerable
+    }
+};
 use crate::config::Config;
 use super::model::UserModel;
 use rnmf::{Real, RealVec2};

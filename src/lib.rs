@@ -20,8 +20,8 @@ pub mod boundary_conditions;
 /// Module to assist with input and output 
 pub mod io;
 
-/// Module for handling global values
-pub mod global;
+// /// Module for handling global values
+// pub mod global;
 
 // /// Module for handling the execution
 // pub mod solver;
@@ -36,8 +36,6 @@ pub type Real = f64;
 pub type Real = f32;
 
 
-#[derive(Debug, Clone, Default)]
-pub struct RealVec1(pub [Real; 1]);
 
 /// Array containing two real numbers
 #[derive(Debug, Clone, Default)]
@@ -83,8 +81,6 @@ impl std::ops::Deref for RealVec3{
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct UIntVec1(pub [usize; 1]);
 
 /// Array containing two unsigned integers
 #[derive(Debug, Clone, Default)]
@@ -154,8 +150,6 @@ impl std::ops::IndexMut<usize> for UIntVec3{
 
 
 
-#[derive(Debug, Clone, Default)]
-pub struct IntVec1(pub [isize; 1]);
 
 /// Slice containing two integers
 #[derive(Debug, Clone, Default)]

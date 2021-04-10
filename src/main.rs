@@ -1,6 +1,12 @@
 use rnmf::*;
 use boundary_conditions::*;
-use crate::mesh::cartesian2d::*;
+use rnmf::mesh::cartesian2d::{
+    mesh::CartesianMesh2D, 
+    dataframe::{
+        CartesianDataFrame2D, 
+        BoundaryCondition2D
+    }
+};
 use std::env;
 
 fn main()  {

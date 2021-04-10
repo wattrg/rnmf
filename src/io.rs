@@ -1,4 +1,4 @@
-use crate::mesh::cartesian2d::*;
+use crate::mesh::cartesian2d::dataframe::{CartesianDataFrame2D};
 //use std::fs::File;
 //use std::io::prelude::*;
 use vtkio::model::*;

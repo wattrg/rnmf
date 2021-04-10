@@ -1,7 +1,7 @@
 use rlua::{UserData, Context};
 use crate::{Real, RealVec2};
 use std::convert::{TryFrom};
-use crate::mesh::cartesian2d::{CartesianDataFrame2D,IndexEnumerable};
+use crate::mesh::cartesian2d::dataframe::{CartesianDataFrame2D,IndexEnumerable};
 use crate::config::UserConfig;
 use crate::io::{VtkData};
 use std::collections::HashMap;

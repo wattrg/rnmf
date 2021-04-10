@@ -1,196 +1,12 @@
-// Todo:
-//      fill_bc accounting for templated data type
-//      finish implementing more boundary conditions
-
-use crate::boundary_conditions::*;
-use std::rc::Rc;
-use crate::{Real, RealVec2, UIntVec2};
-use std::collections::HashMap;
-use super::DataFrameContainer;
-
-type DfHashMap<T> = HashMap<String, CartesianDataFrame2D<T>>;
-
-/// Structure containing data to define a CartesianMesh
-#[derive(Debug, Clone)]
-pub struct CartesianMesh2D {
-    /// The position of the nodes in the mesh
-    pub node_pos: Vec<Real>,
-
-    /// The lower corner of the mesh
-    pub lo: RealVec2,
-
-    /// The upper corner of the mesh
-    pub hi: RealVec2,
-
-    /// The number of cells in nodes in each direction
-    pub n : UIntVec2,
-
-    /// The distance between each node in each
-    pub dx: RealVec2,
-
-    /// The number of dimensions
-    pub dim: usize,
-    
-    /// The number of nodes in the mesh
-    n_nodes: usize
-}
-
-/// provides functionality to assist with indexing of data. This is separate to the index operator
-trait Indexing{
-    /// Returns the non-flat index of the item stored at a particular flattened location
-    fn get_ij(&self, p: usize ) -> Option<(isize, isize, usize)>;
-
-    /// Returns a borrow to the value stored at a particular non-flat index
-    fn index(&self, i: isize, j: isize, n: usize) -> &Real;
-}
-
-
-impl CartesianMesh2D {
-    /// Generate new CartesianMesh from the lo and high corner, 
-    /// and the number of nodes
-    pub fn new(lo: RealVec2, hi: RealVec2, n: UIntVec2) -> Rc<CartesianMesh2D>
-    {
-        let mut dx = [0.0; 2];
-        for i_dim in 0..2_usize{
-            dx[i_dim] = (hi[i_dim] - lo[i_dim])/(n[i_dim] as Real);
-        }
-        
-
-        // calculate the capacity of the vector required to store all the node positions
-        let n_nodes = n[0]*n[1]*2;
-
-        // allocate memory to the node positions vector
-        let node_pos = Vec::with_capacity(n_nodes);
-
-        // allocate memory to the mesh
-        let mut cm = CartesianMesh2D
-        {
-            lo,
-            hi,
-            n,
-            dx: RealVec2(dx),
-            node_pos,
-            dim: 2,
-            n_nodes,
-        };
-
-        // calculate the positions of the nodes
-        // this will be able to be done better by creating an enumerating iterator
-        // which will give (i,j,n) to begin with
-        cm.node_pos = (0..n_nodes).map(
-            |p: usize| -> Real {
-                let (i,j,n) = cm.get_ij(p).unwrap();
-                match n {
-                    0 => {cm.lo[n] + ((i as Real) + 0.5) * cm.dx[n]}
-                    1 => {cm.lo[n] + ((j as Real) + 0.5) * cm.dx[n]}
-                    _ => {panic!("n cannot be {} in 2D", n)}
-                }
-                
-            }).collect();
-        Rc::new(cm)
-    }
-}
-
-/// function to convert a multi-dimensional coordinate into a single dimension coordinate
-fn get_flat_index(i: isize, j: isize, n: usize, 
-            dimension: &UIntVec2, ng: usize) -> usize {
-
-    let mut p = i + ng as isize;
-    p += dimension[0] as isize * (j + ng as isize) 
-            + (dimension[0] * dimension[1] * n) as isize;
-    
-
-    p as usize
-}
-
-/// Converts (3+1)D index into a 1D (flattened) index
-fn get_ij_from_p(p: usize, dimension: &UIntVec2, n_nodes: usize, ng: usize) 
-                                                        -> Option<(isize, isize, usize)>{
-    if p >= n_nodes {
-        Option::None
-    }
-
-    else{
-        let i = (p % dimension[0]) as isize;
-        let j;
-        let d: isize;
-
-        j = (p as isize - i)/dimension[0] as isize % dimension[1] as isize;
-
-        d = (p as isize - j * dimension[1] as isize - i)
-                    /dimension[0] as isize % 2;
-        Some((i - ng as isize, j - ng as isize, d as usize))
-    }
-}
-
-impl Indexing for CartesianMesh2D
-{
-    /// Retrieves the element at (i,j,n)
-    fn index(&self, i: isize, j: isize, n: usize) -> & Real
-    {
-        let p = get_flat_index(i, j, n, &self.n, 0);
-        let np = self.node_pos.get(p as usize);
-        match np{
-            Some(np) => {np},
-            None => panic!("Index ({}, {}, {}) out of range of Cartesian mesh with size {:?}", 
-                                i,j,n, self.n),
-        }
-
-    }
-
-    /// Returns the un-flattened index
-    fn get_ij(& self, p: usize) -> Option<(isize, isize, usize)>{
-        get_ij_from_p(p, &self.n, self.n_nodes, 0)
-    }
-}
-
-
-/// Immutable Iterator struct for CartesianMesh
-pub struct CartesianMeshIter <'a> {
-    mesh: &'a CartesianMesh2D,
-    current_indx: usize,
-}
-
-impl <'a> Iterator for CartesianMeshIter<'a>{
-    // return a vector of references instead of slice because the length of the returned object
-    // depends on the number of dimensions, and thus is not known at compile time, so slices
-    // won't work
-    type Item = Vec<&'a Real>;
-    
-    fn next(& mut self) -> Option<Self::Item>{
-        // If the next position doesn't exist, return None
-        if 2*self.current_indx >= self.mesh.node_pos.len(){
-            None
-        }
-        // If the next position exists, return a vector of size 2 containing references
-        // to the position
-        else {
-            let mut next_pos = Vec::with_capacity(self.mesh.dim);
-            let (i,j,n) = self.mesh.get_ij(self.current_indx).unwrap();
-            for i_dim in 0..2 {
-                next_pos.push(self.mesh.index(i, j, n + i_dim))
-            }
-            self.current_indx += 1;
-            Some(next_pos)
-        }
-    }
-}
-
-impl <'a> IntoIterator for &'a CartesianMesh2D {
-    type Item = Vec<&'a Real>;
-    type IntoIter = CartesianMeshIter<'a>;
-
-    fn into_iter(self) -> CartesianMeshIter<'a> {
-        CartesianMeshIter{
-            current_indx: 0,
-            mesh: & self,
-        }
-    }
-}
-
-
 
 // ********************************* Cartesian data frame ****************************************
+use std::rc::Rc;
+//use crate::{Real, UIntVec2};
+use super::*;
+use super::mesh::*;
+use crate::boundary_conditions::{BCs, BcType};
+
+/// Enum to mark each cell as either valid, or the location of the ghost cell
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum CellType{
     Valid,
@@ -232,59 +48,6 @@ pub struct CartesianDataFrame2D<T>{
     /// The boundary conditions to apply for the data frame
     pub bc: BCs,
 }
-
-/// For parallel computations, the entire domain is split up into segments. A CartesianBlock
-/// contains all the information for one of these segments, with a cartesian mesh.
-#[derive(Debug, Clone)]
-pub struct CartesianBlock<T> {
-    /// An id to identify the block, and will be used for identifying neighbouring blocks
-    pub id: usize,
-
-    /// Optional name for the block, to make identifying it easier for people
-    pub name: Option<String>,
-
-    /// The underlying mesh for this block
-    pub mesh: Rc<CartesianMesh2D>,
-
-    /// The dataframes for the block, stored in a hashmap so they can be identified by a name
-    pub dfs: DfHashMap<T>,
-
-    /// The blocks stored on the low side of the block. None if there is no block
-    pub lo_connectivity: [Option<usize>; 2],
-
-    /// The blocks stored on the high side of the block. None if there is no block
-    pub hi_connectivity: [Option<usize>; 2],
-}
-
-// impl CartesianBlock {
-//     pub fn new(id: usize, mesh:CartesianMesh2D, dfs: DfHashMap) -> CartesianBlock{
-//         CartesianBlock{
-//             id,
-//             name: None,
-//             mesh,
-//             dfs,
-//             lo_connectivity: [None, None],
-//             hi_connectivity: [None, None],
-//         }
-//     }
-
-//     pub fn fill_bc()
-// }
-
-impl <T> core::ops::Index<&str> for CartesianBlock<T> {
-    type Output = CartesianDataFrame2D<T>;
-
-    fn index (&self, name: &str) -> &Self::Output {
-        &self.dfs
-             .get(name)
-             .unwrap_or_else(|| 
-                panic!("{} not in CartesianBlock with id: {}, name: {:?}", name, self.id, self.name)
-            )
-    }
-}
-impl <T> DataFrameContainer for CartesianBlock<T> {}
-
-
 
 /// data structure to store data on CartesianMesh
 impl <T: Clone+Default> CartesianDataFrame2D<T> {
@@ -393,7 +156,6 @@ impl <T> core::ops::IndexMut<(isize, isize, usize)> for CartesianDataFrame2D<T> 
 impl <T> core::ops::Index<(isize, isize, usize)> for CartesianDataFrame2D<T>{
     type Output = T;
 
-    #[allow(dead_code)] 
     /// Borrows the element at (i,j,n). The valid cells are indexed from zero
     /// and ghost cells at the lower side of the domain are indexed with negative
     /// numbers.
@@ -444,13 +206,13 @@ impl CartesianDataFrame2D<Real> {
             if i_dim == 0{
                 for ghost_indx in 0..self.n_ghost as isize{
                     self[(hi[i_dim]+ghost_indx, i,i_comp)] = self[(hi[i_dim]-1-ghost_indx,i,i_comp)] 
-                            + gradient * (2.0*(ghost_indx+1) as Real-1.0)*self.underlying_mesh.dx[i_dim];
+                      + gradient * (2.0*(ghost_indx+1) as Real-1.0)*self.underlying_mesh.dx[i_dim];
                 }
             }
             if i_dim == 1 {
                 for ghost_indx in 0..self.n_ghost as isize {
                     self[(i,hi[i_dim]+ghost_indx,i_comp)] = self[(i,hi[i_dim]-1-ghost_indx,i_comp)] 
-                            + gradient * (2.0*(ghost_indx+1) as Real-1.0)*self.underlying_mesh.dx[i_dim];
+                      + gradient * (2.0*(ghost_indx+1) as Real-1.0)*self.underlying_mesh.dx[i_dim];
                 }
             }
         }
@@ -476,12 +238,14 @@ impl CartesianDataFrame2D<Real> {
         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
             if i_dim == 0{
                 for ghost_indx in 0..self.n_ghost as isize{
-                    self[(hi[i_dim]+ghost_indx,i,i_comp)] = 2.0*value - self[(hi[i_dim]-1-ghost_indx,i,i_comp)];
+                    self[(hi[i_dim]+ghost_indx,i,i_comp)] = 2.0*value 
+                                                - self[(hi[i_dim]-1-ghost_indx,i,i_comp)];
                 }
             }
             else if i_dim == 1 {
                 for ghost_indx in 0..self.n_ghost as isize{
-                    self[(i,hi[i_dim]+ghost_indx,i_comp)] = 2.0*value - self[(i,hi[i_dim]-1-ghost_indx,i_comp)];
+                    self[(i,hi[i_dim]+ghost_indx,i_comp)] = 2.0*value 
+                                                - self[(i,hi[i_dim]-1-ghost_indx,i_comp)];
                 }
             }
         }
@@ -685,12 +449,14 @@ impl <'a,T: Clone+Default> Iterator for EnumerateIndex<'a,T> {
     }
 }
 
-/// Structure to mutably iterate over data, giving both the position of the data, and the data itself
+/// Structure to mutably iterate over data, giving both the position of the data,
+///  and the data itself
 pub struct EnumeratePos<'a,T>{
     iter: CartesianDataFrame2DIterMut<'a,T>,
 }
 
-/// Turns `CartesianDataFrameIter` into a mutable iterator which enumerates the position of the data
+/// Turns `CartesianDataFrameIter` into a mutable iterator which enumerates the position 
+/// of the data
 pub trait PosEnumerable <'a,T> {
     fn enumerate_pos(self) -> EnumeratePos<'a,T>;
 }
@@ -884,18 +650,19 @@ impl <'a,T: Clone + BoundaryCondition2D + Default> Iterator for EnumerateGhostIn
     }
 }
 
-
-
 #[cfg(test)]
 mod tests{
     use super::*;
+    use crate::boundary_conditions::*;
 
     #[test]
     fn data_frame_iterator() {
         
         // 2D
         {
-            let m2 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3, 3]));
+            let m2 = CartesianMesh2D::new(
+                RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3, 3])
+            );
             let mut df2 = CartesianDataFrame2D::<Real>::new_from(&m2, BCs::empty(), 1, 1);
             df2.fill_ic(|x,y,_| x + y);
             
@@ -911,69 +678,6 @@ mod tests{
             assert_eq!(df2_iter.next(), Some(& 10.0));
             assert_eq!(df2_iter.next(), None);
         }
-    }
-
-    // #[test]
-    // fn ghost_iterator() {
-    //     let m2 = CartesianMesh2D::new([0.0, 0.0], [10.0, 10.0], [5, 5]);
-    //     let mut df = CartesianDataFrame2D::new_from(&m2, 1, 1);
-    //     let df_iter = df.iter_mut().ghost().enumerate_index();
-    //     let mut count = 0;
-    //     for (_, _) in df_iter{
-    //         count += 1;
-    //     }
-    //     assert_eq!(count, 24);
-    // }
-
-    #[test]
-    fn mesh_iterator () {
-
-        let m2 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3, 3]));
-        let mut m2_iter = m2.into_iter();
-        assert_eq!(m2_iter.next().unwrap(), vec![& 1.0, & 1.0]);
-        assert_eq!(m2_iter.next().unwrap(), vec![& 3.0, & 1.0]);
-        assert_eq!(m2_iter.next().unwrap(), vec![& 5.0, & 1.0]);
-        assert_eq!(m2_iter.next().unwrap(), vec![& 1.0, & 3.0]);
-        assert_eq!(m2_iter.next().unwrap(), vec![& 3.0, & 3.0]);
-        assert_eq!(m2_iter.next().unwrap(), vec![& 5.0, & 3.0]);
-        assert_eq!(m2_iter.next().unwrap(), vec![& 1.0, & 5.0]);
-        assert_eq!(m2_iter.next().unwrap(), vec![& 3.0, & 5.0]);
-        assert_eq!(m2_iter.next().unwrap(), vec![& 5.0, & 5.0]);
-        assert_eq!(m2_iter.next(), Option::None);
-    }
-
-    #[test]
-    fn indexing () {
-
-        let m2 = CartesianMesh2D::new(RealVec2([0.0,0.0]), RealVec2([6.0,6.0]), UIntVec2([3,3]));
-        assert_eq!(m2.get_ij(16).unwrap(), (1,2,1));
-        assert_eq!(m2.get_ij(40), Option::None);
-        assert_eq!(m2.index(2,1,1), &3.0);
-
-    }
-
-    #[test]
-    fn node_pos () {
-
-        let m2 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([10.0, 10.0]), UIntVec2([5,5]));
-        assert_eq!(
-            m2.node_pos,
-            vec![
-                // x values
-                1.0, 3.0, 5.0, 7.0, 9.0, 
-                1.0, 3.0, 5.0, 7.0, 9.0,
-                1.0, 3.0, 5.0, 7.0, 9.0,
-                1.0, 3.0, 5.0, 7.0, 9.0,
-                1.0, 3.0, 5.0, 7.0, 9.0,
-                // y values
-                1.0, 1.0, 1.0, 1.0, 1.0,
-                3.0, 3.0, 3.0, 3.0, 3.0, 
-                5.0, 5.0, 5.0, 5.0, 5.0,
-                7.0, 7.0, 7.0, 7.0, 7.0, 
-                9.0, 9.0, 9.0, 9.0, 9.0
-            ]
-        );
-
     }
 
     #[test]
@@ -1118,4 +822,3 @@ mod tests{
         )
     }
 }
-

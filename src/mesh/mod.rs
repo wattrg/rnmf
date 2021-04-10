@@ -1,14 +1,11 @@
 // /// one dimensional mesh
 // pub mod cartesian1d;
 
-/// two dimensional mesh
+/// # Two dimensional cartesian mesh
+/// A mesh where each cell is the same size, and has edges perpendicular to the *x* and *y* axis.
 pub mod cartesian2d;
 
-// /// three dimensional mesh
-// pub mod cartesian3d;
-
-// /// 1, 2, or 3 dimensional mesh
-// pub mod cartesian_any_d;
-
-
-pub trait DataFrameContainer {}
+/// Main data structure describing the domain
+pub struct Domain<M> {
+    blocks: Vec<M>,
+}
