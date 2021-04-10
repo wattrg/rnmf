@@ -1,9 +1,6 @@
 // Todo:
-//     - boundary conditions for any dimension
-//     - tests for all dimensions (all tests except boundary conditions have tests for at least
-//       1 and 2 dimensions)
-//     - labels for each cell, so that cells may be marked as a certain type
-
+//      fill_bc accounting for templated data type
+//      finish implementing more boundary conditions
 
 use crate::boundary_conditions::*;
 use std::rc::Rc;
@@ -413,7 +410,7 @@ pub trait BoundaryCondition2D {
     /// function which fills the boundary conditions
     fn fill_bc(&mut self);
 }
-pub trait GhostCells{
+trait GhostCells{
     /// checks if the cell at (i,j,k) contains a valid or a ghost cell. Returns true if valid,
     /// and returns false if ghost
     fn ij_is_valid_cell(&self, i: isize, j: isize) -> bool;
@@ -422,6 +419,64 @@ pub trait GhostCells{
     fn p_is_valid_cell(&self, p: usize) -> bool;
 }
 
+// private implementation of boundary conditions
+impl CartesianDataFrame2D<Real> {
+    fn neumann_low(&mut self, gradient: &Real, i_comp: usize, i_dim: usize) {
+        if self.n_ghost >= 2 {panic!{"Two or more ghost cells not supported for Neumann BC yet"};}
+        for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
+            if i_dim == 0 {
+                self[(-1, i,i_comp)] = self[(1,i,i_comp)] 
+                        - 2.0 * gradient * self.underlying_mesh.dx[i_dim];
+            }
+            if i_dim == 1 {
+                self[(i, -1,i_comp)] = self[(i,1,i_comp)] 
+                        - 2.0 * gradient * self.underlying_mesh.dx[i_dim];
+            }
+        }
+    }
+
+    fn neumann_high(&mut self, gradient: &Real, i_comp: usize, i_dim: usize) {
+        if self.n_ghost >= 2 {panic!{"Two or more ghost cells not supported for Neumann BC yet"};}
+        let hi = vec![self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
+        for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
+            if i_dim == 0{
+                self[(hi[i_dim], i,i_comp)] = self[(hi[i_dim]-2,i,i_comp)] 
+                        + 2.0 * gradient * self.underlying_mesh.dx[i_dim];
+            }
+            if i_dim == 1 {
+                self[(i,hi[i_dim],i_comp)] = self[(i,hi[i_dim]-2,i_comp)] 
+                        + 2.0 * gradient * self.underlying_mesh.dx[i_dim];
+            }
+        }
+    }
+
+    fn dirichlet_low(&mut self, value: &Real, i_comp: usize, i_dim: usize) {
+        for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
+            if i_dim == 0{
+                let m = -(value - self[(0,i,i_comp)]);
+                self[(-1,i,i_comp)] = self[(0,i,i_comp)] - 2.0 * m;
+            }
+            else if i_dim == 1 {
+                let m = -(value - self[(i,0,i_comp)]);
+                self[(i,-1,i_comp)] = self[(i,0,i_comp)] - 2.0 * m;
+            }
+        }
+    }
+
+    fn dirichlet_high(&mut self, value: &Real, i_comp: usize, i_dim: usize) {
+        let hi = vec![self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
+        for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
+            if i_dim == 0{
+                let m = value - self[(hi[i_dim]-1,i,i_comp)];
+                self[(hi[i_dim],i,i_comp)] = self[(hi[i_dim]-1,i,i_comp)] + 2.0 * m;
+            }
+            else if i_dim == 1 {
+                let m = value - self[(i, hi[i_dim]-1,i_comp)];
+                self[(i,hi[i_dim],i_comp)] = self[(i,hi[i_dim]-1,i_comp)] + 2.0 * m;
+            }
+        }
+    }
+}
 
 impl <'a> BoundaryCondition2D for CartesianDataFrame2D<Real>{
     /// Fill the ghost nodes of the CartesianDataFrame based on BcType
@@ -433,65 +488,30 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D<Real>{
                 let bc_hi = &self.bc.bcs[i_comp].hi[i_dim].clone();
                 // low boundary condition
                 match bc_lo {
-                    BcType::Prescribed(_values) => {
-                        panic!("Prescribed boundary conditions not supported yet");
-                    }
                     BcType::Neumann(gradient) => {
-                        if self.n_ghost >= 2 {panic!{"Two or more ghost cells not supported for Neumann BC yet"};}
-                        for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
-                            if i_dim == 0 {
-                                self[(-1, i,i_comp)] = self[(1,i,i_comp)] - 2.0 * gradient * self.underlying_mesh.dx[i_dim];
-                            }
-                            if i_dim == 1 {
-                                self[(i, -1,i_comp)] = self[(i,1,i_comp)] - 2.0 * gradient * self.underlying_mesh.dx[i_dim];
-                            }
-                        }
+                        self.neumann_low(gradient, i_comp, i_dim);
                     }
                     BcType::Dirichlet(value) => {
-                        for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
-                            if i_dim == 0{
-                                let m = -(value - self[(0,i,i_comp)]);
-                                self[(-1,i,i_comp)] = self[(0,i,i_comp)] - 2.0 * m;
-                            }
-                            else if i_dim == 1 {
-                                let m = -(value - self[(i,0,i_comp)]);
-                                self[(i,-1,i_comp)] = self[(i,0,i_comp)] - 2.0 * m;
-                            }
-                        }
+                        self.dirichlet_low(value, i_comp, i_dim);
+                    }
+                    BcType::Reflect => {panic!("Reflect boundary condition not supported yet")}
+                    BcType::Internal(_id) => {
+                        panic!("Internal boundary condition not supported yet");
                     }
                 }
 
                 // high boundary condition
                 match bc_hi {
-                    BcType::Prescribed(_values) => {
-                        panic!("Prescribed boundary condition not yet supported");
-                    }
-                
                     BcType::Neumann(gradient) => {
-                        if self.n_ghost >= 2 {panic!{"Two or more ghost cells not supported for Neumann BC yet"};}
-                        let hi = vec![self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
-                        for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
-                            if i_dim == 0{
-                                self[(hi[i_dim], i,i_comp)] = self[(hi[i_dim]-2,i,i_comp)] + 2.0 * gradient * self.underlying_mesh.dx[i_dim];
-                            }
-                            if i_dim == 1 {
-                                self[(i,hi[i_dim],i_comp)] = self[(i,hi[i_dim]-2,i_comp)] + 2.0 * gradient * self.underlying_mesh.dx[i_dim];
-                            }
-                        }
+                        self.neumann_high(gradient, i_comp, i_dim);
                     }
                     
                     BcType::Dirichlet(value) => {
-                        let hi = vec![self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
-                        for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
-                            if i_dim == 0{
-                                let m = value - self[(hi[i_dim]-1,i,i_comp)];
-                                self[(hi[i_dim],i,i_comp)] = self[(hi[i_dim]-1,i,i_comp)] + 2.0 * m;
-                            }
-                            else if i_dim == 1 {
-                                let m = value - self[(i, hi[i_dim]-1,i_comp)];
-                                self[(i,hi[i_dim],i_comp)] = self[(i,hi[i_dim]-1,i_comp)] + 2.0 * m;
-                            }
-                        }
+                        self.dirichlet_high(value, i_comp, i_dim);
+                    }
+                    BcType::Reflect => {panic!("Reflect boundary condition not supported yet")}
+                    BcType::Internal(_id) => {
+                        panic!("Internal boundary condition not supported yet")
                     }
                 }
             }

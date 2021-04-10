@@ -1,6 +1,5 @@
 use crate::Real;
 
-
 // ****************** Define traits all data frames must have *****************
 /// All data frames must have a `BoundaryCondition` trait, so that the ghost
 /// nodes can be filled
@@ -20,17 +19,19 @@ pub trait BoundaryCondition {
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum BcType {
-    /// user supplies a vector which is placed into ghost cells.
-    /// The first entry in the vector is put in the ghost cell closest to
-    /// the valid computational domain
-    Prescribed(Vec<Real>),
-
     /// Linearly extrapolates ghost cells from the data in the valid region,
     /// so that the value on the boundary is the value supplied by the user
     Dirichlet(Real),
 
     /// Specifies the gradient at the boundary
     Neumann(Real),
+
+    /// The ghost cells will become a reflection of the actual values
+    Reflect,
+
+    /// boundary is internal to the overall domain, and should be filled with values from the block
+    /// with the given `id` 
+    Internal(usize),
 }
 
 // /// specifies the boundary condition for each inner component of the data
