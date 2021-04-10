@@ -421,7 +421,7 @@ trait GhostCells{
 
 // private implementation of boundary conditions
 impl CartesianDataFrame2D<Real> {
-    fn neumann_low(&mut self, gradient: &Real, i_comp: usize, i_dim: usize) {
+    fn fill_neumann_low(&mut self, gradient: &Real, i_comp: usize, i_dim: usize) {
         if self.n_ghost >= 2 {panic!{"Two or more ghost cells not supported for Neumann BC yet"};}
         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
             if i_dim == 0 {
@@ -435,7 +435,7 @@ impl CartesianDataFrame2D<Real> {
         }
     }
 
-    fn neumann_high(&mut self, gradient: &Real, i_comp: usize, i_dim: usize) {
+    fn fill_neumann_high(&mut self, gradient: &Real, i_comp: usize, i_dim: usize) {
         if self.n_ghost >= 2 {panic!{"Two or more ghost cells not supported for Neumann BC yet"};}
         let hi = [self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
@@ -450,7 +450,7 @@ impl CartesianDataFrame2D<Real> {
         }
     }
 
-    fn dirichlet_low(&mut self, value: &Real, i_comp: usize, i_dim: usize) {
+    fn fill_dirichlet_low(&mut self, value: &Real, i_comp: usize, i_dim: usize) {
         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
             if i_dim == 0{
                 let m = -(value - self[(0,i,i_comp)]);
@@ -463,7 +463,7 @@ impl CartesianDataFrame2D<Real> {
         }
     }
 
-    fn dirichlet_high(&mut self, value: &Real, i_comp: usize, i_dim: usize) {
+    fn fill_dirichlet_high(&mut self, value: &Real, i_comp: usize, i_dim: usize) {
         let hi = vec![self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
             if i_dim == 0{
@@ -489,10 +489,10 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D<Real>{
                 // low boundary condition
                 match bc_lo {
                     BcType::Neumann(gradient) => {
-                        self.neumann_low(gradient, i_comp, i_dim);
+                        self.fill_neumann_low(gradient, i_comp, i_dim);
                     }
                     BcType::Dirichlet(value) => {
-                        self.dirichlet_low(value, i_comp, i_dim);
+                        self.fill_dirichlet_low(value, i_comp, i_dim);
                     }
                     BcType::Reflect => {panic!("Reflect boundary condition not supported yet")}
                     BcType::Internal(_id) => {
@@ -503,11 +503,11 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D<Real>{
                 // high boundary condition
                 match bc_hi {
                     BcType::Neumann(gradient) => {
-                        self.neumann_high(gradient, i_comp, i_dim);
+                        self.fill_neumann_high(gradient, i_comp, i_dim);
                     }
                     
                     BcType::Dirichlet(value) => {
-                        self.dirichlet_high(value, i_comp, i_dim);
+                        self.fill_dirichlet_high(value, i_comp, i_dim);
                     }
                     BcType::Reflect => {panic!("Reflect boundary condition not supported yet")}
                     BcType::Internal(_id) => {
