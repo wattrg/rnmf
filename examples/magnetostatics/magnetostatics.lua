@@ -5,7 +5,7 @@ n_cells = UIntVec2(301, 301)
 
 -- model
 model = Model({
-    H_far = RealVec2(1.0, 0.0),
+    H_far = RealVec2(0.0, 1.0),
     bubble_centre = RealVec2(301.0/2, 301.0/2),
     mu = RealVec2(3.2, 1.0),
     n_iter = 10,

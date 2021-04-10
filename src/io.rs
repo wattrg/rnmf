@@ -60,7 +60,7 @@ impl TryFrom<CartesianDataFrame2D<Real>> for VtkData<Real> {
                     for j in 0..df.underlying_mesh.n[1] as isize {
                         reshaped_data.push(df[(i,j,0)]);
                         reshaped_data.push(df[(i,j,1)]);
-                        reshaped_data.push(df[(i,j,1)]);
+                        reshaped_data.push(0.0);
                     }
                 }
                 Ok(VtkData{

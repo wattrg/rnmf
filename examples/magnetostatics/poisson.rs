@@ -22,7 +22,8 @@ fn get_laplace(phi: &CartesianDataFrame2D<Real>, model: &Config<UserModel>) -> C
                         + phi[(i-1,j  ,0)]*(mu(i-1,j  ,dx,model) + mu(i,j,dx,model))/2.0
                         + phi[(i  ,j+1,0)]*(mu(i  ,j+1,dx,model) + mu(i,j,dx,model))/2.0
                         + phi[(i  ,j-1,0)]*(mu(i  ,j-1,dx,model) + mu(i,j,dx,model))/2.0
-                        - phi[(i  ,j  ,0)]*(mu(i+1,j  ,dx,model) + mu(i-1,j,dx,model)+mu(i,j+1,dx,model)+mu(i,j-1,dx,model)+4.0*mu(i,j,dx,model))/2.0;
+                        - (phi[(i  ,j  ,0)]*(mu(i+1,j  ,dx,model) + mu(i-1,j,dx,model)
+                                +mu(i,j+1,dx,model)+mu(i,j-1,dx,model)+4.0*mu(i,j,dx,model)))/2.0;
     }
     
     lap.fill_bc();
@@ -42,10 +43,10 @@ fn is_inside(i: isize, j: isize, dx: &RealVec2, config: &Config<UserModel>) -> b
     let x_pos = (i as Real + 0.5) * dx[0];
     let y_pos = (j as Real + 0.5) * dx[1];
 
-    let x_dist = (x_pos - config.model.bubble_centre[0]).abs();
-    let y_dist = (y_pos - config.model.bubble_centre[1]).abs();
+    let x_dist_squared = (x_pos - config.model.bubble_centre[0]).powf(2.0);
+    let y_dist_squared = (y_pos - config.model.bubble_centre[1]).powf(2.0);
 
-    x_dist * x_dist + y_dist * y_dist <= config.model.bubble_radius*config.model.bubble_radius
+    x_dist_squared + y_dist_squared <= config.model.bubble_radius*config.model.bubble_radius
 }
 
 pub fn mu(i: isize, j: isize, dx: &RealVec2, config: &Config<UserModel>) -> Real {

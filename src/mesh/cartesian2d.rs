@@ -425,27 +425,27 @@ impl CartesianDataFrame2D<Real> {
         if self.n_ghost >= 2 {panic!{"Two or more ghost cells not supported for Neumann BC yet"};}
         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
             if i_dim == 0 {
-                self[(-1, i,i_comp)] = self[(1,i,i_comp)] 
-                        - 2.0 * gradient * self.underlying_mesh.dx[i_dim];
+                self[(-1, i,i_comp)] = self[(0,i,i_comp)] 
+                        - gradient * self.underlying_mesh.dx[i_dim];
             }
             if i_dim == 1 {
-                self[(i, -1,i_comp)] = self[(i,1,i_comp)] 
-                        - 2.0 * gradient * self.underlying_mesh.dx[i_dim];
+                self[(i, -1,i_comp)] = self[(i,0,i_comp)] 
+                        - gradient * self.underlying_mesh.dx[i_dim];
             }
         }
     }
 
     fn neumann_high(&mut self, gradient: &Real, i_comp: usize, i_dim: usize) {
         if self.n_ghost >= 2 {panic!{"Two or more ghost cells not supported for Neumann BC yet"};}
-        let hi = vec![self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
+        let hi = [self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
             if i_dim == 0{
-                self[(hi[i_dim], i,i_comp)] = self[(hi[i_dim]-2,i,i_comp)] 
-                        + 2.0 * gradient * self.underlying_mesh.dx[i_dim];
+                self[(hi[i_dim], i,i_comp)] = self[(hi[i_dim]-1,i,i_comp)] 
+                        + gradient * self.underlying_mesh.dx[i_dim];
             }
             if i_dim == 1 {
-                self[(i,hi[i_dim],i_comp)] = self[(i,hi[i_dim]-2,i_comp)] 
-                        + 2.0 * gradient * self.underlying_mesh.dx[i_dim];
+                self[(i,hi[i_dim],i_comp)] = self[(i,hi[i_dim]-1,i_comp)] 
+                        + gradient * self.underlying_mesh.dx[i_dim];
             }
         }
     }
@@ -880,9 +880,6 @@ mod tests{
             let mut df2 = CartesianDataFrame2D::<Real>::new_from(&m2, BCs::empty(), 1, 1);
             df2.fill_ic(|x,y,_| x + y);
             
-            println!("{:?}", df2);
-
-
             let mut df2_iter = df2.into_iter();
             assert_eq!(df2_iter.next(), Some(&2.0));
             assert_eq!(df2_iter.next(), Some(& 4.0));
@@ -997,6 +994,57 @@ mod tests{
         );
 
     }
+
+    #[test]
+    fn test_dirichlet_bc() {
+        let u1 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3,3]));
+        let bc = BCs::new(vec![
+            ComponentBCs::new(
+                //        x direction             y direction
+                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(3.0)], // low
+                vec![BcType::Dirichlet(7.0), BcType::Dirichlet(4.0)], //high
+            )
+        ]);
+        let mut cdf = CartesianDataFrame2D::new_from(&u1, bc, 1, 1);
+        cdf.fill_ic(|x,_,_| x + 1.0);
+        cdf.fill_bc();
+        assert_eq!(
+            cdf.data,
+            vec![
+                 0.0, 4.0, 2.0, 0.0, 0.0, 
+                -2.0, 2.0, 4.0, 6.0, 8.0,
+                -2.0, 2.0, 4.0, 6.0, 8.0,
+                -2.0, 2.0, 4.0, 6.0, 8.0,
+                 0.0, 6.0, 4.0, 2.0, 0.0     
+            ]
+        );
+    }
+
+    #[test]
+    fn test_neumann_bc() {
+        let u1 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3,3]));
+        let bc = BCs::new(vec![
+            ComponentBCs::new(
+                //        x direction             y direction
+                vec![BcType::Neumann( 0.0), BcType::Neumann(-1.0)], // low
+                vec![BcType::Neumann(-2.0), BcType::Neumann( 1.0)], // high
+            )
+        ]);
+        let mut cdf = CartesianDataFrame2D::new_from(&u1, bc, 1, 1);
+        cdf.fill_ic(|x,_,_| x + 1.0);
+        cdf.fill_bc();
+        assert_eq!(
+            cdf.data,
+            vec![
+                0.0, 4.0, 6.0, 8.0, 0.0,
+                2.0, 2.0, 4.0, 6.0, 2.0, 
+                2.0, 2.0, 4.0, 6.0, 2.0,
+                2.0, 2.0, 4.0, 6.0, 2.0,
+                0.0, 4.0, 6.0, 8.0, 0.0
+            ]
+        )
+    }
+
 
 
 }
