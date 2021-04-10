@@ -422,30 +422,36 @@ trait GhostCells{
 // private implementation of boundary conditions
 impl CartesianDataFrame2D<Real> {
     fn fill_neumann_low(&mut self, gradient: &Real, i_comp: usize, i_dim: usize) {
-        if self.n_ghost >= 2 {panic!{"Two or more ghost cells not supported for Neumann BC yet"};}
         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
             if i_dim == 0 {
-                self[(-1, i,i_comp)] = self[(0,i,i_comp)] 
-                        - gradient * self.underlying_mesh.dx[i_dim];
+                for ghost_indx in 1..self.n_ghost as isize + 1{
+                    self[(-ghost_indx, i,i_comp)] = self[(ghost_indx-1,i,i_comp)] 
+                            - gradient * (2.0*ghost_indx as Real - 1.0)*self.underlying_mesh.dx[i_dim];
+                }
             }
             if i_dim == 1 {
-                self[(i, -1,i_comp)] = self[(i,0,i_comp)] 
-                        - gradient * self.underlying_mesh.dx[i_dim];
+                for ghost_indx in 1..self.n_ghost as isize + 1{
+                    self[(i, -ghost_indx,i_comp)] = self[(i,ghost_indx-1,i_comp)] 
+                            - gradient * (2.0*ghost_indx as Real-1.0)*self.underlying_mesh.dx[i_dim];
+                }
             }
         }
     }
 
     fn fill_neumann_high(&mut self, gradient: &Real, i_comp: usize, i_dim: usize) {
-        if self.n_ghost >= 2 {panic!{"Two or more ghost cells not supported for Neumann BC yet"};}
         let hi = [self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
             if i_dim == 0{
-                self[(hi[i_dim], i,i_comp)] = self[(hi[i_dim]-1,i,i_comp)] 
-                        + gradient * self.underlying_mesh.dx[i_dim];
+                for ghost_indx in 0..self.n_ghost as isize{
+                    self[(hi[i_dim]+ghost_indx, i,i_comp)] = self[(hi[i_dim]-1-ghost_indx,i,i_comp)] 
+                            + gradient * (2.0*(ghost_indx+1) as Real-1.0)*self.underlying_mesh.dx[i_dim];
+                }
             }
             if i_dim == 1 {
-                self[(i,hi[i_dim],i_comp)] = self[(i,hi[i_dim]-1,i_comp)] 
-                        + gradient * self.underlying_mesh.dx[i_dim];
+                for ghost_indx in 0..self.n_ghost as isize {
+                    self[(i,hi[i_dim]+ghost_indx,i_comp)] = self[(i,hi[i_dim]-1-ghost_indx,i_comp)] 
+                            + gradient * (2.0*(ghost_indx+1) as Real-1.0)*self.underlying_mesh.dx[i_dim];
+                }
             }
         }
     }
@@ -453,12 +459,14 @@ impl CartesianDataFrame2D<Real> {
     fn fill_dirichlet_low(&mut self, value: &Real, i_comp: usize, i_dim: usize) {
         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
             if i_dim == 0{
-                let m = -(value - self[(0,i,i_comp)]);
-                self[(-1,i,i_comp)] = self[(0,i,i_comp)] - 2.0 * m;
+                for ghost_indx in 0..self.n_ghost as isize{
+                    self[(-ghost_indx-1,i,i_comp)] = 2.0*value - self[(ghost_indx,i,i_comp)];
+                }
             }
             else if i_dim == 1 {
-                let m = -(value - self[(i,0,i_comp)]);
-                self[(i,-1,i_comp)] = self[(i,0,i_comp)] - 2.0 * m;
+                for ghost_indx in 0..self.n_ghost as isize{
+                    self[(i,-ghost_indx-1,i_comp)] = 2.0*value - self[(i,ghost_indx,i_comp)];
+                }
             }
         }
     }
@@ -467,12 +475,14 @@ impl CartesianDataFrame2D<Real> {
         let hi = vec![self.underlying_mesh.n[0] as isize, self.underlying_mesh.n[1] as isize];
         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
             if i_dim == 0{
-                let m = value - self[(hi[i_dim]-1,i,i_comp)];
-                self[(hi[i_dim],i,i_comp)] = self[(hi[i_dim]-1,i,i_comp)] + 2.0 * m;
+                for ghost_indx in 0..self.n_ghost as isize{
+                    self[(hi[i_dim]+ghost_indx,i,i_comp)] = 2.0*value - self[(hi[i_dim]-1-ghost_indx,i,i_comp)];
+                }
             }
             else if i_dim == 1 {
-                let m = value - self[(i, hi[i_dim]-1,i_comp)];
-                self[(i,hi[i_dim],i_comp)] = self[(i,hi[i_dim]-1,i_comp)] + 2.0 * m;
+                for ghost_indx in 0..self.n_ghost as isize{
+                    self[(i,hi[i_dim]+ghost_indx,i_comp)] = 2.0*value - self[(i,hi[i_dim]-1-ghost_indx,i_comp)];
+                }
             }
         }
     }
@@ -494,7 +504,9 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D<Real>{
                     BcType::Dirichlet(value) => {
                         self.fill_dirichlet_low(value, i_comp, i_dim);
                     }
-                    BcType::Reflect => {panic!("Reflect boundary condition not supported yet")}
+                    BcType::Reflect => {
+                        panic!("Reflect boundary condition not supported yet")
+                    }
                     BcType::Internal(_id) => {
                         panic!("Internal boundary condition not supported yet");
                     }
@@ -509,7 +521,9 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D<Real>{
                     BcType::Dirichlet(value) => {
                         self.fill_dirichlet_high(value, i_comp, i_dim);
                     }
-                    BcType::Reflect => {panic!("Reflect boundary condition not supported yet")}
+                    BcType::Reflect => {
+                        panic!("Reflect boundary condition not supported yet")
+                    }
                     BcType::Internal(_id) => {
                         panic!("Internal boundary condition not supported yet")
                     }
@@ -714,7 +728,9 @@ impl std::ops::Mul<CartesianDataFrame2D<Real>> for Real {
     type Output = CartesianDataFrame2D<Real>;
 
     fn mul(self, rhs: CartesianDataFrame2D<Real>) -> Self::Output {
-        let mut result = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost);
+        let mut result = CartesianDataFrame2D::new_from(
+            &rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost
+        );
         for (i, vals) in result.data.iter_mut().enumerate(){
             *vals = self * rhs.data[i];
         }
@@ -729,7 +745,9 @@ impl std::ops::Mul<&CartesianDataFrame2D<Real>> for Real {
     type Output = CartesianDataFrame2D<Real>;
 
     fn mul(self, rhs: &CartesianDataFrame2D<Real>) -> Self::Output {
-        let mut result = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost);
+        let mut result = CartesianDataFrame2D::new_from(
+            &rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost
+        );
         for (i, vals) in result.data.iter_mut().enumerate(){
             *vals = self * rhs.data[i];
         }
@@ -744,7 +762,9 @@ impl std::ops::Add<&CartesianDataFrame2D<Real>> for &CartesianDataFrame2D<Real> 
     type Output = CartesianDataFrame2D<Real>;
 
     fn add(self, rhs: &CartesianDataFrame2D<Real>) -> Self::Output {
-        let mut sum = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost);
+        let mut sum = CartesianDataFrame2D::new_from(
+            &rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost
+        );
         for (i, vals) in sum.data.iter_mut().enumerate() {
             *vals = self.data[i] + rhs.data[i];
         }
@@ -759,7 +779,9 @@ impl std::ops::Mul<&CartesianDataFrame2D<Real>> for &CartesianDataFrame2D<Real> 
     type Output = CartesianDataFrame2D<Real>;
 
     fn mul(self, rhs: &CartesianDataFrame2D<Real>) -> Self::Output {
-        let mut result = CartesianDataFrame2D::new_from(&rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost);
+        let mut result = CartesianDataFrame2D::new_from(
+            &rhs.underlying_mesh, rhs.bc.clone(), rhs.n_comp, rhs.n_ghost
+        );
         for (i, vals) in result.data.iter_mut().enumerate(){
             *vals = self.data[i] * rhs.data[i];
         }
@@ -868,10 +890,7 @@ impl <'a,T: Clone + BoundaryCondition2D + Default> Iterator for EnumerateGhostIn
 mod tests{
     use super::*;
 
-
-
     #[test]
-    // currently only tests the iterator on 1D data
     fn data_frame_iterator() {
         
         // 2D
@@ -996,7 +1015,7 @@ mod tests{
     }
 
     #[test]
-    fn test_dirichlet_bc() {
+    fn test_dirichlet_bc_one_ghost() {
         let u1 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3,3]));
         let bc = BCs::new(vec![
             ComponentBCs::new(
@@ -1021,7 +1040,7 @@ mod tests{
     }
 
     #[test]
-    fn test_neumann_bc() {
+    fn test_neumann_bc_one_ghost() {
         let u1 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3,3]));
         let bc = BCs::new(vec![
             ComponentBCs::new(
@@ -1045,7 +1064,58 @@ mod tests{
         )
     }
 
+    #[test]
+    fn test_neumann_bc_two_ghost(){
+        let u1 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3,3]));
+        let bc = BCs::new(vec![
+            ComponentBCs::new(
+                //        x direction             y direction
+                vec![BcType::Neumann( 0.0), BcType::Neumann(-1.0)], // low
+                vec![BcType::Neumann(-2.0), BcType::Neumann( 1.0)], // high
+            )
+        ]);
+        let mut cdf = CartesianDataFrame2D::new_from(&u1, bc, 1, 2);
+        cdf.fill_ic(|x,_,_| x + 1.0);
+        cdf.fill_bc();
+        assert_eq!(
+            cdf.data,
+            vec![
+                0.0, 0.0, 8.0, 10.0, 12.0, 0.0,  0.0, 
+                0.0, 0.0, 4.0,  6.0,  8.0, 0.0,  0.0,
+                4.0, 2.0, 2.0,  4.0,  6.0, 2.0, -8.0,
+                4.0, 2.0, 2.0,  4.0,  6.0, 2.0, -8.0,
+                4.0, 2.0, 2.0,  4.0,  6.0, 2.0, -8.0,
+                0.0, 0.0, 4.0,  6.0,  8.0, 0.0,  0.0,
+                0.0, 0.0, 8.0, 10.0, 12.0, 0.0,  0.0
+            ]
+        )
+    }
 
-
+    #[test]
+    fn test_dirichlet_bc_two_ghost () {
+        let u1 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3,3]));
+        let bc = BCs::new(vec![
+            ComponentBCs::new(
+                //        x direction             y direction
+                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(3.0)], // low
+                vec![BcType::Dirichlet(7.0), BcType::Dirichlet(4.0)], //high
+            )
+        ]);
+        let mut cdf = CartesianDataFrame2D::new_from(&u1, bc, 1, 2);
+        cdf.fill_ic(|x,_,_| x + 1.0);
+        cdf.fill_bc();
+        assert_eq!(
+            cdf.data,
+            vec![
+                 0.0,  0.0, 4.0, 2.0, 0.0, 0.0,  0.0,
+                 0.0,  0.0, 4.0, 2.0, 0.0, 0.0,  0.0,
+                -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
+                -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
+                -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
+                 0.0,  0.0, 6.0, 4.0, 2.0, 0.0,  0.0,
+                 0.0,  0.0, 6.0, 4.0, 2.0, 0.0,  0.0
+            ]
+        )
+    }
 }
 
