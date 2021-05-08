@@ -68,10 +68,6 @@ impl <T: Clone + Default> Domain<CartesianBlock<T>> {
         let n_cells_per_block_x = (n_cells[0])/(n_blocks[0]);
         let n_cells_per_block_y = (n_cells[1])/(n_blocks[1]);
 
-        println!("n_cells = {:?}", n_cells);
-        println!("n_blocks = {:?}", n_blocks);
-        println!("n_cells_per_block_x = {:?}, n_cells_per_block_y = {:?}", n_cells_per_block_x, n_cells_per_block_y);
-
         // the last block takes the left over cells
         let n_cells_final_x = n_cells[0] % n_blocks[0];
         let n_cells_final_y = n_cells[1] % n_blocks[1];
@@ -118,8 +114,6 @@ impl <T: Clone + Default> Domain<CartesianBlock<T>> {
                     cells[1] += n_cells_final_y;
                     high_block[1] += n_cells_final_y as Real * dy;
                 }
-                println!("low = {:?}, cells = {:?}, i_block = {}, j_block = {}", low, cells, i_block, j_block);
-                println!("high_block = {:?}", high_block);
 
                 // construct the block
                 let block = CartesianBlock::<T>::new(
@@ -165,6 +159,6 @@ mod tests{
             vec![BCs::empty(), BCs::empty()],                   // bcd
             vec![1,1]                                           // num_ghost
         );
-        println!("domain = {:?}", _domain);
+        //println!("domain = {:?}", _domain);
     }
 }
