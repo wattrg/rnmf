@@ -5,6 +5,7 @@ use std::rc::Rc;
 use super::*;
 use super::mesh::*;
 use crate::boundary_conditions::{BCs, BcType};
+use super::super::DataFrame;
 
 /// Enum to mark each cell as either valid, or the location of the ghost cell
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -48,6 +49,8 @@ pub struct CartesianDataFrame2D<T>{
     /// The boundary conditions to apply for the data frame
     pub bc: BCs,
 }
+
+impl <T: Clone + Default> DataFrame for CartesianDataFrame2D<T> {}
 
 /// data structure to store data on CartesianMesh
 impl <T: Clone+Default> CartesianDataFrame2D<T> {
@@ -147,7 +150,7 @@ impl <T> core::ops::IndexMut<(isize, isize, usize)> for CartesianDataFrame2D<T> 
     /// and ghost cells at the lower side of the domain are indexed with negative numbers
     fn index_mut(&mut self, indx: (isize,isize,usize)) -> &mut T {
         let (i,j,n) = indx;
-        let p = get_flat_index(i,j,n,&self.n_grown,self.n_ghost);
+        let p = get_flat_index_unchecked(i,j,n,&self.n_grown,self.n_ghost);
         &mut self.data[p]
     }
 }
@@ -161,7 +164,7 @@ impl <T> core::ops::Index<(isize, isize, usize)> for CartesianDataFrame2D<T>{
     /// numbers.
     fn index(&self, indx: (isize, isize, usize) ) -> & Self::Output {
         let (i,j,n) = indx;
-        let p = get_flat_index(i, j, n, &self.n_grown, self.n_ghost);
+        let p = get_flat_index_unchecked(i, j, n, &self.n_grown, self.n_ghost);
 
         &self.data[p]
     }

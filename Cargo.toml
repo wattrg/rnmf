@@ -22,5 +22,5 @@ multi_buffer = []
 rlua = "0.17.0"
 #derive = {version="0.1.0", path = "./derive"}
 indicatif = "0.15.0"
-vtkio = {git = "https://github.com/elrnv/vtkio"}
+vtkio = "0.6"
 colored = "2.0"

@@ -17,7 +17,7 @@ pub trait BoundaryCondition {
 
 /// Available boundary conditions
 #[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum BcType {
     /// Linearly extrapolates ghost cells from the data in the valid region,
     /// so that the value on the boundary is the value supplied by the user

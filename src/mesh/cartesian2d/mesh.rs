@@ -66,11 +66,11 @@ impl CartesianMesh2D {
             |p: usize| -> Real {
                 let (i,j,n) = cm.get_ij(p).unwrap();
                 match n {
-                    0 => {cm.lo[n] + ((i as Real) + 0.5) * cm.dx[n]}
-                    1 => {cm.lo[n] + ((j as Real) + 0.5) * cm.dx[n]}
-                    _ => {panic!("n cannot be {} in 2D", n)}
+                    0 => {cm.lo[0] + ((i as Real) + 0.5) * cm.dx[0]}
+                    1 => {cm.lo[1] + ((j as Real) + 0.5) * cm.dx[1]}
+                    _ => {panic!("dimension number cannot be {} in 2D", n)}
                 }
-                
+
             }).collect();
         Rc::new(cm)
     }
@@ -82,7 +82,7 @@ impl Indexing for CartesianMesh2D
     /// Retrieves the element at (i,j,n)
     fn index(&self, i: isize, j: isize, n: usize) -> & Real
     {
-        let p = get_flat_index(i, j, n, &self.n, 0);
+        let p = get_flat_index_unchecked(i, j, n, &self.n, 0);
         let np = self.node_pos.get(p as usize);
         match np{
             Some(np) => {np},
@@ -148,6 +148,13 @@ impl <'a> IntoIterator for &'a CartesianMesh2D {
 #[cfg(test)]
 mod tests{
     use super::*;
+
+    #[test]
+    fn mesh_constructor(){
+        let m = CartesianMesh2D::new(
+            RealVec2([0.0, 4.0]), RealVec2([2.0, 8.0]), UIntVec2([2,3])
+        );
+    }
 
     #[test]
     fn mesh_iterator () {
