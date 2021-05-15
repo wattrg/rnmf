@@ -9,7 +9,7 @@ use super::super::DataFrame;
 
 /// Enum to mark each cell as either valid, or the location of the ghost cell
 #[derive(Debug, Clone, Eq, PartialEq)]
-enum CellType{
+pub enum CellType{
     Valid,
     North,
     South,
@@ -558,30 +558,23 @@ impl std::ops::Mul<&CartesianDataFrame2D<Real>> for &CartesianDataFrame2D<Real> 
     }
 }
 
-
-
-
-//impl DataFrame for CartesianDataFrame {}
-
-
-/// mutable iterator for `CartesianDataFrame`.
+/// mutable iterator over the east cells in `CartesianDataFrame`.
 pub struct CartesianDataFrameGhostIter<'a,T> {
     df: &'a mut CartesianDataFrame2D<T>,
     current_indx: usize,
+    side: Vec<CellType>,
 }
 
-
-
-impl <'a,T: Clone+BoundaryCondition2D+Default> Iterator for CartesianDataFrameGhostIter<'a,T> {
+impl <'a,T: Clone + Default, > Iterator for CartesianDataFrameGhostIter<'a,T> {
     type Item = &'a mut T;
 
     // this is a safe function wrapping unsafe code. Rust cannot guarantee that it is safe, but
     // in practice it can be, and I'm pretty sure that it should be safe for everything we will 
     // ever want to do
     fn next(&mut self) -> Option<Self::Item> {
-        // progress the current index to skip ghost cells
+        // progress the current index to next on the given side
         while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
-                                   self.df.p_is_valid_cell(self.current_indx) {
+                                  !(self.side.contains(&self.df.cell_type[self.current_indx])) {
             self.current_indx += 1;
         }
 
@@ -605,14 +598,15 @@ impl <'a,T: Clone+BoundaryCondition2D+Default> Iterator for CartesianDataFrameGh
 }
 
 pub trait GhostIterator <'a,T> {
-    fn ghost(self) -> CartesianDataFrameGhostIter<'a,T>;
+    fn ghost(self, side: Vec<CellType>) -> CartesianDataFrameGhostIter<'a,T>;
 }
 
 impl <'a,T> GhostIterator <'a,T> for CartesianDataFrame2DIterMut<'a,T> {
-    fn ghost(self) -> CartesianDataFrameGhostIter<'a,T> {
+    fn ghost(self, side: Vec<CellType>) -> CartesianDataFrameGhostIter<'a,T> {
         CartesianDataFrameGhostIter{
             current_indx: 0,
             df: self.df,
+            side,
         }   
     }
 }
@@ -636,7 +630,7 @@ impl <'a,T> GhostIndexEnumerable <'a,T> for CartesianDataFrameGhostIter<'a,T> {
     }
 }
 
-impl <'a,T: Clone + BoundaryCondition2D + Default> Iterator for EnumerateGhostIndex<'a,T> {
+impl <'a,T: Clone + Default> Iterator for EnumerateGhostIndex<'a,T> {
     type Item = ((isize, isize, usize), &'a mut T);
 
     fn next(&mut self) -> Option<Self::Item>{
@@ -823,5 +817,40 @@ mod tests{
                  0.0,  0.0, 6.0, 4.0, 2.0, 0.0,  0.0
             ]
         )
+    }
+
+    #[test]
+    fn test_ghost_iter_two_ghost () {
+        let u1 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3,3]));
+        let bc = BCs::new(vec![
+            ComponentBCs::new(
+                //        x direction             y direction
+                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(3.0)], // low
+                vec![BcType::Dirichlet(7.0), BcType::Dirichlet(4.0)], //high
+            )
+        ]);
+        let mut cdf = CartesianDataFrame2D::new_from(&u1, bc, 1, 2);
+        cdf.fill_ic(|x,_,_| x + 1.0);
+        cdf.fill_bc();
+        assert_eq!(
+            cdf.data,
+            vec![
+                 0.0,  0.0, 4.0, 2.0, 0.0, 0.0,  0.0,
+                 0.0,  0.0, 4.0, 2.0, 0.0, 0.0,  0.0,
+                -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
+                -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
+                -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
+                 0.0,  0.0, 6.0, 4.0, 2.0, 0.0,  0.0,
+                 0.0,  0.0, 6.0, 4.0, 2.0, 0.0,  0.0
+            ]
+        );
+        let mut east_iter = cdf.iter_mut().ghost(vec![CellType::East]);
+        assert_eq!(east_iter.next(), Some(&mut 8.0));
+        assert_eq!(east_iter.next(), Some(&mut 10.0));
+        assert_eq!(east_iter.next(), Some(&mut 8.0));
+        assert_eq!(east_iter.next(), Some(&mut 10.0));
+        assert_eq!(east_iter.next(), Some(&mut 8.0));
+        assert_eq!(east_iter.next(), Some(&mut 10.0));
+        assert_eq!(east_iter.next(), None);
     }
 }
