@@ -276,10 +276,10 @@ impl <'a> BoundaryCondition2D<Real> for CartesianDataFrame2D<Real>{
                         self.fill_dirichlet_low(value, i_comp, i_dim);
                     }
                     BcType::Reflect => {
-                        panic!("Reflect boundary condition not supported yet")
+                        unimplemented!("Reflect boundary condition not supported yet")
                     }
                     BcType::Internal(_id) => {
-                        panic!("Internal boundary condition not supported yet");
+                        unimplemented!("Internal boundary condition not supported yet");
                     }
                 }
 
@@ -293,10 +293,10 @@ impl <'a> BoundaryCondition2D<Real> for CartesianDataFrame2D<Real>{
                         self.fill_dirichlet_high(value, i_comp, i_dim);
                     }
                     BcType::Reflect => {
-                        panic!("Reflect boundary condition not supported yet")
+                        unimplemented!("Reflect boundary condition not supported yet")
                     }
                     BcType::Internal(_id) => {
-                        panic!("Internal boundary condition not supported yet")
+                        unimplemented!("Internal boundary condition not supported yet")
                     }
                 }
             }
@@ -874,7 +874,7 @@ mod tests{
     }
 
     #[test]
-    fn test_ghost_iter_two_ghost () {
+    fn test_ghost_iter_mut_two_ghost () {
         let u1 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3,3]));
         let bc = BCs::new(vec![
             ComponentBCs::new(
@@ -902,6 +902,38 @@ mod tests{
         assert_eq!(east_iter.next(), Some(&mut 10.0));
         assert_eq!(east_iter.next(), Some(&mut 8.0));
         assert_eq!(east_iter.next(), Some(&mut 10.0));
+        assert_eq!(east_iter.next(), None);
+    }
+
+    #[test]
+    fn test_ghost_iter_two_ghost () {
+        let u1 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3,3]));
+        let bc = BCs::new(vec![
+            ComponentBCs::new(
+                //        x direction             y direction
+                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(3.0)], // low
+                vec![BcType::Dirichlet(7.0), BcType::Dirichlet(4.0)], //high
+            )
+        ]);
+        let mut cdf = CartesianDataFrame2D::new_from(&u1, bc, 1, 2);
+        cdf.fill_ic(|x,_,_| x + 1.0);
+        cdf.fill_bc();
+        //vec![
+        //     0.0,  0.0, 4.0, 2.0, 0.0, 0.0,  0.0,
+        //     0.0,  0.0, 4.0, 2.0, 0.0, 0.0,  0.0,
+        //    -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
+        //    -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
+        //    -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
+        //     0.0,  0.0, 6.0, 4.0, 2.0, 0.0,  0.0,
+        //     0.0,  0.0, 6.0, 4.0, 2.0, 0.0,  0.0
+        //]
+        let mut east_iter = cdf.iter().ghost(vec![CellType::East]);
+        assert_eq!(east_iter.next(), Some(& 8.0));
+        assert_eq!(east_iter.next(), Some(& 10.0));
+        assert_eq!(east_iter.next(), Some(& 8.0));
+        assert_eq!(east_iter.next(), Some(& 10.0));
+        assert_eq!(east_iter.next(), Some(& 8.0));
+        assert_eq!(east_iter.next(), Some(& 10.0));
         assert_eq!(east_iter.next(), None);
     }
 }
