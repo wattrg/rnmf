@@ -13,6 +13,7 @@ use crate::boundary_conditions::BCs;
 /// accessed by a name easily recognisable by humans.
 type DfHashMap<T> = std::collections::HashMap<String, CartesianDataFrame2D<T>>;
 
+/// Array containing connectivity information for the block
 type Connectivity = [Option<usize>; 2];
 
 /// # Cartesian block

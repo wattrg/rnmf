@@ -171,10 +171,14 @@ impl <T> core::ops::Index<(isize, isize, usize)> for CartesianDataFrame2D<T>{
 }
 
 
-pub trait BoundaryCondition2D {
+pub trait BoundaryCondition2D<T> {
     /// function which fills the boundary conditions
     fn fill_bc(&mut self);
+
+    /// gather ghost cell data into a vector to move to another block
+    fn collect_ghost_cells(&self, side: Vec<CellType>) -> Vec<T>;
 }
+
 trait GhostCells{
     /// checks if the cell at (i,j,k) contains a valid or a ghost cell. Returns true if valid,
     /// and returns false if ghost
@@ -255,7 +259,7 @@ impl CartesianDataFrame2D<Real> {
     }
 }
 
-impl <'a> BoundaryCondition2D for CartesianDataFrame2D<Real>{
+impl <'a> BoundaryCondition2D<Real> for CartesianDataFrame2D<Real>{
     /// Fill the ghost nodes of the CartesianDataFrame based on BcType
     fn fill_bc (&mut self) {
         for i_comp in 0..self.n_comp{
@@ -297,6 +301,13 @@ impl <'a> BoundaryCondition2D for CartesianDataFrame2D<Real>{
                 }
             }
         }
+    }
+
+    fn collect_ghost_cells(&self, side: Vec<CellType>) -> Vec<Real> {
+        self.iter()
+            .ghost(side)
+            .cloned()
+            .collect()
     }
 }   
 
@@ -558,14 +569,20 @@ impl std::ops::Mul<&CartesianDataFrame2D<Real>> for &CartesianDataFrame2D<Real> 
     }
 }
 
+pub struct CartesianDataFrameGhostIter<'a, T> {
+    df: &'a CartesianDataFrame2D<T>,
+    current_indx: usize,
+    side: Vec<CellType>,
+}
+
 /// mutable iterator over the east cells in `CartesianDataFrame`.
-pub struct CartesianDataFrameGhostIter<'a,T> {
+pub struct CartesianDataFrameGhostIterMut<'a,T> {
     df: &'a mut CartesianDataFrame2D<T>,
     current_indx: usize,
     side: Vec<CellType>,
 }
 
-impl <'a,T: Clone + Default, > Iterator for CartesianDataFrameGhostIter<'a,T> {
+impl <'a,T: Clone + Default> Iterator for CartesianDataFrameGhostIterMut<'a,T> {
     type Item = &'a mut T;
 
     // this is a safe function wrapping unsafe code. Rust cannot guarantee that it is safe, but
@@ -579,9 +596,8 @@ impl <'a,T: Clone + Default, > Iterator for CartesianDataFrameGhostIter<'a,T> {
         }
 
         // check if the next item exists
-        if self.current_indx <= self.df.n_nodes-self.df.n_comp 
-                   && !self.df.p_is_valid_cell(self.current_indx){
-            // access and return next item 
+        if self.current_indx <= self.df.n_nodes-self.df.n_comp {
+            // access and return next item
             let ptr = self.df.data.as_mut_ptr();
             let next_data: Option<Self::Item>;
             unsafe{
@@ -597,13 +613,41 @@ impl <'a,T: Clone + Default, > Iterator for CartesianDataFrameGhostIter<'a,T> {
     }
 }
 
-pub trait GhostIterator <'a,T> {
-    fn ghost(self, side: Vec<CellType>) -> CartesianDataFrameGhostIter<'a,T>;
+impl <'a, T: Clone + Default> Iterator for CartesianDataFrameGhostIter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // progress the current index to next on the given side
+        while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
+                                  !(self.side.contains(&self.df.cell_type[self.current_indx])) {
+            self.current_indx += 1;
+        }
+
+        // check if the next item exists
+        if self.current_indx <= self.df.n_nodes-self.df.n_comp{
+            // access and return next item
+            let next_data = Some(&self.df.data[self.current_indx]);
+            self.current_indx += 1;
+            next_data
+        }
+        // if the next item doesn't exist, return None
+        else {
+            None
+        }
+    }
 }
 
-impl <'a,T> GhostIterator <'a,T> for CartesianDataFrame2DIterMut<'a,T> {
-    fn ghost(self, side: Vec<CellType>) -> CartesianDataFrameGhostIter<'a,T> {
-        CartesianDataFrameGhostIter{
+pub trait GhostIteratorMut <'a,T> {
+    fn ghost(self, side: Vec<CellType>) -> CartesianDataFrameGhostIterMut<'a,T>;
+}
+
+pub trait GhostIterator <'a, T> {
+    fn ghost(self, side: Vec<CellType>) -> CartesianDataFrameGhostIter<'a, T>;
+}
+
+impl <'a,T> GhostIteratorMut <'a,T> for CartesianDataFrame2DIterMut<'a,T> {
+    fn ghost(self, side: Vec<CellType>) -> CartesianDataFrameGhostIterMut<'a,T> {
+        CartesianDataFrameGhostIterMut{
             current_indx: 0,
             df: self.df,
             side,
@@ -611,10 +655,20 @@ impl <'a,T> GhostIterator <'a,T> for CartesianDataFrame2DIterMut<'a,T> {
     }
 }
 
+impl <'a, T> GhostIterator <'a, T> for CartesianDataFrame2DIter<'a, T> {
+    fn ghost(self, side: Vec<CellType>) -> CartesianDataFrameGhostIter<'a, T> {
+        CartesianDataFrameGhostIter{
+            current_indx: 0,
+            df: self.df,
+            side,
+        }
+    }
+}
+
 
 /// Struct to iterate over a data frame, with the current index and the data itself
 pub struct EnumerateGhostIndex<'a,T>{
-    iter: CartesianDataFrameGhostIter<'a,T>,
+    iter: CartesianDataFrameGhostIterMut<'a,T>,
 }
 
 /// Turns `CartesianDataFrameIter` into an iterator which enumerates over the current index
@@ -622,7 +676,7 @@ pub trait GhostIndexEnumerable <'a,T> {
     fn enumerate_index(self) -> EnumerateGhostIndex<'a,T>;
 }
 
-impl <'a,T> GhostIndexEnumerable <'a,T> for CartesianDataFrameGhostIter<'a,T> {
+impl <'a,T> GhostIndexEnumerable <'a,T> for CartesianDataFrameGhostIterMut<'a,T> {
     fn enumerate_index(self) -> EnumerateGhostIndex<'a,T> {
         EnumerateGhostIndex{
             iter: self,
@@ -832,18 +886,15 @@ mod tests{
         let mut cdf = CartesianDataFrame2D::new_from(&u1, bc, 1, 2);
         cdf.fill_ic(|x,_,_| x + 1.0);
         cdf.fill_bc();
-        assert_eq!(
-            cdf.data,
-            vec![
-                 0.0,  0.0, 4.0, 2.0, 0.0, 0.0,  0.0,
-                 0.0,  0.0, 4.0, 2.0, 0.0, 0.0,  0.0,
-                -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
-                -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
-                -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
-                 0.0,  0.0, 6.0, 4.0, 2.0, 0.0,  0.0,
-                 0.0,  0.0, 6.0, 4.0, 2.0, 0.0,  0.0
-            ]
-        );
+        //vec![
+        //     0.0,  0.0, 4.0, 2.0, 0.0, 0.0,  0.0,
+        //     0.0,  0.0, 4.0, 2.0, 0.0, 0.0,  0.0,
+        //    -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
+        //    -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
+        //    -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 10.0,
+        //     0.0,  0.0, 6.0, 4.0, 2.0, 0.0,  0.0,
+        //     0.0,  0.0, 6.0, 4.0, 2.0, 0.0,  0.0
+        //]
         let mut east_iter = cdf.iter_mut().ghost(vec![CellType::East]);
         assert_eq!(east_iter.next(), Some(&mut 8.0));
         assert_eq!(east_iter.next(), Some(&mut 10.0));
