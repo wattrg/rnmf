@@ -55,11 +55,11 @@ fn get_ij_from_p(p: usize, dimension: &UIntVec2, n_nodes: usize, ng: usize)
 
 
 /// Implementation of `Domain` for 2D cartesian meshes
-impl <T: Clone + Default> Domain<CartesianBlock<T>> {
+impl <S: Clone + Default> Domain<CartesianBlock<S>> {
     pub fn new_rectangular(low: RealVec2, high: RealVec2,  n_cells: UIntVec2,
                            n_blocks: UIntVec2, var_names: Vec<String>,
-                           num_comps: Vec<usize>, bcs: Vec<BCs>,
-                           num_ghost: Vec<usize> ) -> Domain<CartesianBlock<T>> {
+                           num_comps: Vec<usize>, bcs: Vec<BCs<S>>,
+                           num_ghost: Vec<usize> ) -> Domain<CartesianBlock<S>> {
 
         // the cells in the domain are divided evenly between each block
         // the floor of the division is taken in case the number of cells isn't divisible by
@@ -77,7 +77,7 @@ impl <T: Clone + Default> Domain<CartesianBlock<T>> {
         let dy = (high[1] - low[1])/(n_cells[1] as Real);
 
         // construct each block
-        let mut blocks: Vec<CartesianBlock<T>> = Vec::with_capacity(total_blocks);
+        let mut blocks: Vec<CartesianBlock<S>> = Vec::with_capacity(total_blocks);
         for i_block in 0..n_blocks[0] {
             for j_block in 0..n_blocks[1] {
                 // the block's id is equivalent to its flattened index
@@ -116,7 +116,7 @@ impl <T: Clone + Default> Domain<CartesianBlock<T>> {
                 }
 
                 // construct the block
-                let block = CartesianBlock::<T>::new(
+                let block = CartesianBlock::<S>::new(
                     None,
                     RealVec2([
                         low[0] + (n_cells_per_block_x * i_block) as Real * dx,
