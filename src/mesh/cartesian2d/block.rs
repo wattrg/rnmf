@@ -21,7 +21,7 @@ type Connectivity = [Option<usize>; 2];
 /// contains all the information for one of these segments, and where it sits in relation to the 
 /// other segments
 #[derive(Debug)]
-pub struct CartesianBlock<T: Clone + Default> {
+pub struct CartesianBlock<S: Clone + Default> {
     /// An id to identify the block, and will be used for identifying neighbouring blocks
     pub id: usize,
 
@@ -32,7 +32,7 @@ pub struct CartesianBlock<T: Clone + Default> {
     mesh: Rc<CartesianMesh2D>,
 
     /// The dataframes for the block, stored in a hashmap so they can be identified by a name
-    dfs: DfHashMap<T>,
+    dfs: DfHashMap<S>,
 
     /// The blocks stored on the low side of the block. None if there is no block
     low_connect: Connectivity,
@@ -41,10 +41,10 @@ pub struct CartesianBlock<T: Clone + Default> {
     high_connect: Connectivity,
 }
 
-impl <T: Clone + Default> Block for CartesianBlock<T>{}
+impl <S: Clone + Default> Block for CartesianBlock<S>{}
 
-impl <T: Clone+Default> core::ops::Index<String> for CartesianBlock<T> {
-    type Output = CartesianDataFrame2D<T>;
+impl <S: Clone+Default> core::ops::Index<String> for CartesianBlock<S> {
+    type Output = CartesianDataFrame2D<S>;
 
     fn index (&self, name: String) -> &Self::Output {
         &self.dfs
@@ -55,19 +55,20 @@ impl <T: Clone+Default> core::ops::Index<String> for CartesianBlock<T> {
     }
 }
 
-impl <T: Clone + Default> CartesianBlock<T> {
+impl <S: Clone + Default> CartesianBlock<S> {
+    /// Create a new `CartesianBlock`
     pub fn new(name: Option<String>, low: RealVec2, high: RealVec2,
                n_cells: UIntVec2, data_names: Vec<String>, num_comps: Vec<usize>,
-               num_ghost: Vec<usize>, id: usize, bcs: Vec<BCs>,
-               low_connect: Connectivity, high_connect: Connectivity) -> CartesianBlock<T>{
+               num_ghost: Vec<usize>, id: usize, bcs: Vec<BCs<S>>,
+               low_connect: Connectivity, high_connect: Connectivity) -> CartesianBlock<S>{
 
         // create the mesh
         let mesh = CartesianMesh2D::new(low, high, n_cells);
 
         // create the dataframes
-        let mut dfs = DfHashMap::<T>::new();
+        let mut dfs = DfHashMap::<S>::new();
         for (i, name) in data_names.iter().enumerate() {
-            let df = CartesianDataFrame2D::<T>::new_from(
+            let df = CartesianDataFrame2D::<S>::new_from(
                 &mesh, bcs[i].clone(), num_comps[i], num_ghost[i]
             );
             dfs.insert(name.to_string(), df);
