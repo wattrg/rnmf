@@ -15,8 +15,7 @@ path="src/lib.rs"
 [features]
 disable_double = []
 dumb_terminal = ["colored/no-color"]
-cartesian = []
-multi_buffer = []
+generic_cell = []
 
 [dependencies]
 rlua = "0.17.0"

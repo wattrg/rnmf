@@ -1,14 +1,25 @@
 use core::ops::Index;
+use crate::Real;
+
+//pub trait State<S=Self>
+//where State<S>:
+//      std::ops::Add
+//    + std::ops::Sub
+//    + std::ops::Mul
+//{
+//
+//}
+
+//impl State for Real{}
 
 /// # Two dimensional cartesian mesh
+///
 /// A mesh where each cell is the same size, and has edges perpendicular to the *x* and *y* axis.
 pub mod cartesian2d;
 
 /// Allows for operations to be performed on any block, regardless of the type of 
 /// mesh contained within
-pub trait Block: Index<String>{
-
-}
+pub trait Block: Index<String>{}
 
 /// Allows for operations to be performed on any dataframe, regardless of the type of 
 /// mesh stored within

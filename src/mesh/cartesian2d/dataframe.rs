@@ -5,7 +5,7 @@ use std::rc::Rc;
 use super::*;
 use super::mesh::*;
 use crate::boundary_conditions::{BCs, BcType};
-use super::super::DataFrame;
+use super::super::{DataFrame};
 
 /// Enum to mark each cell as either valid, or the location of the ghost cell
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -21,7 +21,24 @@ pub enum CellType{
     SouthWest,
 }
 
-/// Structure to store data defined on a `CartesianMesh`
+/// # Structure to store data defined on a `CartesianMesh`
+///
+/// This is where the actual data is stored. Each DataFrame contains information
+/// at each location in the underlying mesh, as well as at some additional locations
+/// outside of the mesh, referred to as ghost cells. These cells serve to enable simple
+/// implementation of boundary conditions. A data frame can have any number of ghost
+/// cells, and a number of common boundary conditions have been implemented for
+/// convenience.
+///
+/// The data is stored in one of two formats, depending on whether the `generic_cell`
+/// feature is enabled or not.
+///
+/// ## `generic_cell`
+/// If `generic_cell` is enabled, then each cell contains any user defined struct.
+///
+/// ## not `generic_cell`
+/// If `generic_cell` is not enabled (by default it is not), then each cell contains
+/// A `Real` number.
 #[derive(Debug, Clone)]
 pub struct CartesianDataFrame2D<S>{
     /// The data is stored here
@@ -190,8 +207,11 @@ trait GhostCells{
     fn p_is_valid_cell(&self, p: usize) -> bool;
 }
 
-// private implementation of boundary conditions
-impl CartesianDataFrame2D<Real> {
+// private implementation of boundary conditions for Real Cells
+#[cfg(not(feature="generic_cell"))]
+impl CartesianDataFrame2D<Real>
+    //where S: State
+{
     fn fill_neumann_low(&mut self, gradient: &Real, i_comp: usize, i_dim: usize) {
         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
             if i_dim == 0 {
@@ -514,7 +534,9 @@ impl <'a, S> Iterator for EnumeratePos<'a,S>
 }
 
 // multiplication of owned data frame by a real number
-impl std::ops::Mul<CartesianDataFrame2D<Real>> for Real {
+#[cfg(not(feature="generic_cell"))]
+impl std::ops::Mul<CartesianDataFrame2D<Real>> for Real
+{
     type Output = CartesianDataFrame2D<Real>;
 
     fn mul(self, rhs: CartesianDataFrame2D<Real>) -> Self::Output {
@@ -531,6 +553,7 @@ impl std::ops::Mul<CartesianDataFrame2D<Real>> for Real {
 /// multiplication of borrowed data frame by real
 /// returns a new owned data frame
 /// takes the boundary conditions of the rhs data frame
+#[cfg(not(feature="generic_cell"))]
 impl std::ops::Mul<&CartesianDataFrame2D<Real>> for Real {
     type Output = CartesianDataFrame2D<Real>;
 
@@ -548,6 +571,7 @@ impl std::ops::Mul<&CartesianDataFrame2D<Real>> for Real {
 /// addition of two borrowed data frames
 /// returns a new owned data frame
 /// takes the boundary conditions of the rhs data frame
+#[cfg(not(feature="generic_cell"))]
 impl std::ops::Add<&CartesianDataFrame2D<Real>> for &CartesianDataFrame2D<Real> {
     type Output = CartesianDataFrame2D<Real>;
 
@@ -565,6 +589,7 @@ impl std::ops::Add<&CartesianDataFrame2D<Real>> for &CartesianDataFrame2D<Real> 
 /// multiplication of two borrowed data frames
 /// returns a new owned data frame
 /// takes the boundary conditions of the rhs data frame
+#[cfg(not(feature="generic_cell"))]
 impl std::ops::Mul<&CartesianDataFrame2D<Real>> for &CartesianDataFrame2D<Real> {
     type Output = CartesianDataFrame2D<Real>;
 
