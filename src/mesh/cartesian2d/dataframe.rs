@@ -72,6 +72,8 @@ impl <S> CartesianDataFrame2D<S>
                     n_comp: usize, 
                     n_ghost: usize) -> CartesianDataFrame2D<S>
     {
+        //assert!(m.n[0] >= 2 * n_ghost && m.n[1] >= 2 * n_ghost);
+
         let n_nodes = ((m.n[0] + 2*n_ghost) * (m.n[1] + 2*n_ghost))*n_comp;
 
         // calculate grown size of the data frame
@@ -83,20 +85,63 @@ impl <S> CartesianDataFrame2D<S>
             // get the index in index space
             let (i,j,_) = get_ij_from_p(p, &n_grown, n_nodes, n_ghost).unwrap();
 
-            // check for ghost cells
-            if j < 0 { *cell = CellType::Ghost(Loc::South); }
-            else if j >= m.n[1] as isize { *cell = CellType::Ghost(Loc::North); }
+            // check for ghost cells in corners
+            if j < 0 && i < 0{
+                *cell = CellType::Ghost(Loc::SouthWest);
+            }
+            else if j < 0 && i >= m.n[0] as isize {
+                *cell = CellType::Ghost(Loc::SouthEast);
+            }
+            else if i < 0 && j >= m.n[1] as isize {
+                *cell = CellType::Ghost(Loc::NorthWest);
+            }
+            else if i >= m.n[0] as isize && j >= m.n[1] as isize {
+                *cell = CellType::Ghost(Loc::NorthEast);
+            }
 
-            if i < 0 {
-                if j < 0 { *cell = CellType::Ghost(Loc::SouthWest); }
-                else if j >= m.n[1] as isize { *cell = CellType::Ghost(Loc::NorthWest); }
-                else { *cell = CellType::Ghost(Loc::West); }
+            // check for edge ghost cells
+            else if i < 0 {
+                *cell = CellType::Ghost(Loc::West);
+            }
+            else if j < 0 {
+                *cell = CellType::Ghost(Loc::South);
             }
             else if i >= m.n[0] as isize {
-                if j < 0 { *cell = CellType::Ghost(Loc::SouthEast); }
-                else if j >= m.n[0] as isize { *cell = CellType::Ghost(Loc::NorthEast); }
-                else{ *cell = CellType::Ghost(Loc::East); }
+                *cell = CellType::Ghost(Loc::East);
             }
+            else if j >= m.n[1] as isize {
+                *cell = CellType::Ghost(Loc::North);
+            }
+
+            // check for corner valid edge cells
+            else if i < n_ghost as isize && j < n_ghost as isize {
+                *cell = CellType::Valid(Loc::SouthWest);
+            }
+            else if i >= (m.n[0] - n_ghost) as isize && j < n_ghost as isize {
+                *cell = CellType::Valid(Loc::SouthEast);
+            }
+            else if j >= (m.n[1] - n_ghost) as isize && i < n_ghost as isize {
+                *cell = CellType::Valid(Loc::NorthWest);
+            }
+            else if j >= (m.n[1] - n_ghost) as isize && i >= (m.n[0] - n_ghost) as isize{
+                *cell = CellType::Valid(Loc::NorthEast);
+            }
+
+            // finally check for valid edge cells
+            else if i < n_ghost as isize{
+                *cell = CellType::Valid(Loc::West);
+            }
+            else if i >= (m.n[0] - n_ghost) as isize{
+                *cell = CellType::Valid(Loc::East);
+            }
+            else if j < n_ghost as isize {
+                *cell = CellType::Valid(Loc::South);
+            }
+            else if j >= (m.n[1] - n_ghost) as isize {
+                *cell = CellType::Valid(Loc::North);
+            }
+
+
         }
 
         CartesianDataFrame2D
@@ -216,9 +261,15 @@ where
 }
 
 
-impl<S> CartesianDataFrame2D<S> {
-    fn collect_edge_cells(&mut self, side: CellType) -> Vec<S> {
-        unimplemented!()
+impl<S> CartesianDataFrame2D<S>
+where
+    S: Clone + Default
+{
+    fn collect_typed_cells(&mut self, side: Vec<CellType>) -> Vec<S> {
+        self.iter()
+            .ghost(side, IterComp::All)
+            .cloned()
+            .collect()
     }
 }
 
@@ -812,19 +863,19 @@ mod tests{
                 CellType::Ghost(Loc::South),
                 CellType::Ghost(Loc::SouthEast),
                 CellType::Ghost(Loc::West),
-                CellType::Valid(Loc::Regular),
-                CellType::Valid(Loc::Regular),
-                CellType::Valid(Loc::Regular),
+                CellType::Valid(Loc::SouthWest),
+                CellType::Valid(Loc::South),
+                CellType::Valid(Loc::SouthEast),
                 CellType::Ghost(Loc::East),
                 CellType::Ghost(Loc::West),
+                CellType::Valid(Loc::West),
                 CellType::Valid(Loc::Regular),
-                CellType::Valid(Loc::Regular),
-                CellType::Valid(Loc::Regular),
+                CellType::Valid(Loc::East),
                 CellType::Ghost(Loc::East),
                 CellType::Ghost(Loc::West),
-                CellType::Valid(Loc::Regular),
-                CellType::Valid(Loc::Regular),
-                CellType::Valid(Loc::Regular),
+                CellType::Valid(Loc::NorthWest),
+                CellType::Valid(Loc::North),
+                CellType::Valid(Loc::NorthEast),
                 CellType::Ghost(Loc::East),
                 CellType::Ghost(Loc::NorthWest),
                 CellType::Ghost(Loc::North),
@@ -1016,4 +1067,60 @@ mod tests{
         assert_eq!(south_iter.next(), None);
     }
 
+    #[test]
+    fn test_ghost_collect_two_edge() {
+        let u1 = CartesianMesh2D::new(
+            RealVec2([0.0, 0.0]),
+            RealVec2([10.0, 10.0]),
+            UIntVec2([5, 5])
+        );
+
+        let bc = BCs::new(vec![
+            ComponentBCs::new(
+                //        x direction             y direction
+                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(3.0)], // low
+                vec![BcType::Dirichlet(7.0), BcType::Dirichlet(4.0)], //high
+            )
+        ]);
+        let mut cdf = CartesianDataFrame2D::new_from(&u1, bc, 1, 2);
+        cdf.fill_ic(|x,_,_| x + 1.0);
+        cdf.fill_bc();
+
+        let north = cdf.collect_typed_cells(
+            vec![
+                CellType::Valid(Loc::North),
+                CellType::Valid(Loc::NorthEast),
+                CellType::Valid(Loc::NorthWest)
+            ]
+        );
+        assert_eq!(north, vec![2.0, 4.0, 6.0, 8.0, 10.0, 2.0, 4.0, 6.0, 8.0, 10.0]);
+
+        let south = cdf.collect_typed_cells(
+            vec![
+                CellType::Valid(Loc::South),
+                CellType::Valid(Loc::SouthWest),
+                CellType::Valid(Loc::SouthEast)
+            ]
+        );
+        assert_eq!(north, vec![2.0, 4.0, 6.0, 8.0, 10.0, 2.0, 4.0, 6.0, 8.0, 10.0]);
+
+        let east = cdf.collect_typed_cells(
+            vec![
+                CellType::Valid(Loc::East),
+                CellType::Valid(Loc::NorthEast),
+                CellType::Valid(Loc::SouthEast)
+            ]
+        );
+        assert_eq!(east, vec![8.0, 10.0, 8.0, 10.0, 8.0, 10.0, 8.0, 10.0, 8.0, 10.0]);
+
+        let west = cdf.collect_typed_cells(
+            vec![
+                CellType::Valid(Loc::West),
+                CellType::Valid(Loc::NorthWest),
+                CellType::Valid(Loc::SouthWest)
+            ]
+        );
+        assert_eq!(west, vec![2.0, 4.0, 2.0, 4.0, 2.0, 4.0, 2.0, 4.0, 2.0, 4.0]);
+    }
 }
+
