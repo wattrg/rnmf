@@ -1,9 +1,8 @@
 
-use super::boundary_conditions::{BcType, BCs, ComponentBCs};
+use super::boundary_conditions::{BcType, BCs, ComponentBCs, BoundaryCondition};
 use rnmf::mesh::cartesian2d::{
     dataframe::{
         CartesianDataFrame2D, 
-        BoundaryCondition2D,
         IndexEnumerable
     }
 };

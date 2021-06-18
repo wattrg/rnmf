@@ -4,21 +4,29 @@ use std::rc::Rc;
 //use crate::{Real, UIntVec2};
 use super::*;
 use super::mesh::*;
-use crate::boundary_conditions::{BCs, BcType};
-use super::super::DataFrame;
+use crate::boundary_conditions::{BCs, BcType, BoundaryCondition};
+use super::super::{DataFrame};
 
-/// Enum to mark each cell as either valid, or the location of the ghost cell
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum CellType{
-    Valid,
+pub enum Loc {
+    Regular,
     North,
     South,
     East,
     West,
     NorthEast,
-    SouthEast,
     NorthWest,
     SouthWest,
+    SouthEast,
+}
+
+/// # CellType
+///
+/// Marks each cell with its location.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum CellType{
+    Valid(Loc),
+    Ghost(Loc),
 }
 
 /// Structure to store data defined on a `CartesianMesh`
@@ -50,7 +58,8 @@ pub struct CartesianDataFrame2D<S>{
     pub bc: BCs<S>,
 }
 
-impl <S: Clone + Default> DataFrame for CartesianDataFrame2D<S> {}
+// Mark CartesianDataFrame as DataFrame
+impl DataFrame for CartesianDataFrame2D<Real>{}
 
 /// data structure to store data on CartesianMesh
 impl <S> CartesianDataFrame2D<S>
@@ -69,25 +78,24 @@ impl <S> CartesianDataFrame2D<S>
         let n_grown: UIntVec2 = m.n.clone().iter().map(|n| n + 2*n_ghost).collect();
 
         // calculate cell_type
-        let mut cell_type = vec![CellType::Valid; n_nodes];
+        let mut cell_type: Vec<CellType> = vec![CellType::Valid(Loc::Regular); n_nodes];
         for (p,cell) in cell_type.iter_mut().enumerate(){
             // get the index in index space
             let (i,j,_) = get_ij_from_p(p, &n_grown, n_nodes, n_ghost).unwrap();
 
-            // check if the cell is a ghost cell, and fill in the appropriate type of ghost cell if
-            // it is
-            if j < 0 { *cell = CellType::South; }
-            else if j >= m.n[1] as isize { *cell = CellType::North; }
+            // check for ghost cells
+            if j < 0 { *cell = CellType::Ghost(Loc::South); }
+            else if j >= m.n[1] as isize { *cell = CellType::Ghost(Loc::North); }
 
             if i < 0 {
-                if j < 0 { *cell = CellType::SouthWest; }
-                else if j >= m.n[1] as isize { *cell = CellType::NorthWest; }
-                else { *cell = CellType::West; }
+                if j < 0 { *cell = CellType::Ghost(Loc::SouthWest); }
+                else if j >= m.n[1] as isize { *cell = CellType::Ghost(Loc::NorthWest); }
+                else { *cell = CellType::Ghost(Loc::West); }
             }
             else if i >= m.n[0] as isize {
-                if j < 0 { *cell = CellType::SouthEast; }
-                else if j >= m.n[0] as isize { *cell = CellType::NorthEast; } 
-                else{ *cell = CellType::East; }
+                if j < 0 { *cell = CellType::Ghost(Loc::SouthEast); }
+                else if j >= m.n[0] as isize { *cell = CellType::Ghost(Loc::NorthEast); }
+                else{ *cell = CellType::Ghost(Loc::East); }
             }
         }
 
@@ -150,6 +158,8 @@ impl <S> CartesianDataFrame2D<S>
 impl <S> core::ops::IndexMut<(isize, isize, usize)> for CartesianDataFrame2D<S> {
     /// Exclusively borrows element at (i,j,n). The valid cells are indexed from zero 
     /// and ghost cells at the lower side of the domain are indexed with negative numbers
+    /// This doesn't check that the index is valid as indices should only be used within
+    /// iterators, which will only yield valid indices.
     fn index_mut(&mut self, indx: (isize,isize,usize)) -> &mut S {
         let (i,j,n) = indx;
         let p = get_flat_index_unchecked(i,j,n,&self.n_grown,self.n_ghost);
@@ -173,24 +183,46 @@ impl <S> core::ops::Index<(isize, isize, usize)> for CartesianDataFrame2D<S>{
 }
 
 
-pub trait BoundaryCondition2D<S> {
-    /// function which fills the boundary conditions
-    fn fill_bc(&mut self);
-
-    /// gather ghost cell data into a vector to move to another block
-    fn collect_ghost_cells(&self, side: Vec<CellType>) -> Vec<S>;
-}
 
 trait GhostCells{
-    /// checks if the cell at (i,j,k) contains a valid or a ghost cell. Returns true if valid,
-    /// and returns false if ghost
+    /// checks if the cell at (i,j,k) contains a valid or a ghost cell.
+    /// Returns true if valid, and returns false if ghost
     fn ij_is_valid_cell(&self, i: isize, j: isize) -> bool;
 
     /// check if the cell at p contains a valid or ghost cell. Returns same as ijk_is_valid_cell
     fn p_is_valid_cell(&self, p: usize) -> bool;
 }
 
-// private implementation of boundary conditions
+
+impl<S> GhostCells for CartesianDataFrame2D<S>
+where
+    S: Clone + Default
+{
+    /// Determines if the cell at (i,j) is a valid cell (returns true) or a ghost
+    /// cell (returns false)
+    /// This will eventually be depricated in favour of the cell_type element in the data structure
+    fn ij_is_valid_cell(&self, i: isize, j: isize) -> bool {
+        let above_zero = i >= 0 && j >= 0;
+
+        let mut below_max = i < self.underlying_mesh.n[0] as isize;
+        below_max = below_max && j < self.underlying_mesh.n[1]  as isize;
+        above_zero && below_max
+    }
+
+    fn p_is_valid_cell(&self, p: usize) -> bool {
+        let (i,j,_) = self.get_ij(p).unwrap();
+        self.ij_is_valid_cell(i, j)
+    }
+}
+
+
+impl<S> CartesianDataFrame2D<S> {
+    fn collect_edge_cells(&mut self, side: CellType) -> Vec<S> {
+        unimplemented!()
+    }
+}
+
+// Some functionality for Real CartesianDataFrames
 impl CartesianDataFrame2D<Real> {
     fn fill_neumann_low(&mut self, gradient: &Real, i_comp: usize, i_dim: usize) {
         for i in 0isize..self.underlying_mesh.n[i_dim] as isize{
@@ -262,7 +294,7 @@ impl CartesianDataFrame2D<Real> {
 }
 
 
-impl <'a> BoundaryCondition2D<Real> for CartesianDataFrame2D<Real>{
+impl BoundaryCondition<Real> for CartesianDataFrame2D<Real>{
     /// Fill the ghost nodes of the CartesianDataFrame based on BcType
     fn fill_bc (&mut self) {
         for i_comp in 0..self.n_comp{
@@ -306,38 +338,20 @@ impl <'a> BoundaryCondition2D<Real> for CartesianDataFrame2D<Real>{
         }
     }
 
-    fn collect_ghost_cells(&self, side: Vec<CellType>) -> Vec<Real> {
-        self.iter()
-            .ghost(side)
-            .cloned()
-            .collect()
-    }
-}   
-
-impl<S> GhostCells for CartesianDataFrame2D<S>
-    where S: Clone + Default
-{
-    /// Determines if the cell at (i,j) is a valid cell (returns true) or a ghost
-    /// cell (returns false)
-    /// This will eventually be depricated in favour of the cell_type element in the data structure
-    fn ij_is_valid_cell(&self, i: isize, j: isize) -> bool {
-        let above_zero = i >= 0 && j >= 0;
-
-        let mut below_max = i < self.underlying_mesh.n[0] as isize;
-        below_max = below_max && j < self.underlying_mesh.n[1]  as isize;
-        above_zero && below_max
-    }
-
-    fn p_is_valid_cell(&self, p: usize) -> bool {
-        let (i,j,_) = self.get_ij(p).unwrap();
-        self.ij_is_valid_cell(i, j)
-    }
 }
+
 
 /// Immutable iterator for `CartesianDataFrame`.
 pub struct CartesianDataFrame2DIter<'a, S> {
     df: &'a CartesianDataFrame2D<S>,
     current_indx: usize,
+}
+
+fn cell_is_valid(cell_type: &CellType) -> bool {
+    match cell_type {
+        CellType::Valid(_) => { true }
+        _ => { false }
+    }
 }
 
 impl <'a, S> Iterator for CartesianDataFrame2DIter<'a, S>{
@@ -346,16 +360,19 @@ impl <'a, S> Iterator for CartesianDataFrame2DIter<'a, S>{
     fn next(&mut self) -> Option<Self::Item> {
         // progress the current index to skip ghost cells
         while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
-                                  // !self.df.p_is_valid_cell(self.current_indx) {
-                                  !(self.df.cell_type[self.current_indx] == CellType::Valid) {
+            !cell_is_valid(&self.df.cell_type[self.current_indx])
+            // !(match self.df.cell_type[self.current_indx]{CellType::Valid(_) => {true} _ => {false}})
+        {
             self.current_indx += 1;
         }
 
         // check if the next item exists
-        if self.current_indx <= self.df.n_nodes - self.df.n_comp
-                   //&& self.df.p_is_valid_cell(self.current_indx){
-                    && self.df.cell_type[self.current_indx] == CellType::Valid {
+        if self.current_indx <= self.df.n_nodes - self.df.n_comp &&
+            cell_is_valid(&self.df.cell_type[self.current_indx])
+            //(match self.df.cell_type[self.current_indx]{CellType::Valid(_) => {true} _ => {false}}){
+                    //&& self.df.cell_type[self.current_indx] == CellType::Valid(_) {
 
+        {
             // access and return next item
             let next_data = Some(&self.df.data[self.current_indx]);
             self.current_indx += 1;
@@ -384,14 +401,18 @@ impl <'a, S> Iterator for CartesianDataFrame2DIterMut<'a, S> {
         // progress the current index to skip ghost cells
         while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
                                   // !self.df.p_is_valid_cell(self.current_indx) {
-                                  !(self.df.cell_type[self.current_indx] == CellType::Valid) {
+            // !(self.df.cell_type[self.current_indx] == CellType::Valid(_))
+            !(match self.df.cell_type[self.current_indx]{CellType::Valid(_) => {true} _ => {false}})
+        {
             self.current_indx += 1;
         }
 
         // check if the next item exists
-        if self.current_indx <= self.df.n_nodes-self.df.n_comp 
+        if self.current_indx <= self.df.n_nodes-self.df.n_comp &&
                    //&& self.df.p_is_valid_cell(self.current_indx){
-                    && self.df.cell_type[self.current_indx] == CellType::Valid {
+            //&& self.df.cell_type[self.current_indx] == CellType::Valid(_)
+            (match self.df.cell_type[self.current_indx]{CellType::Valid(_) => {true} _ => {false}})
+        {
             // access and return next item 
             let ptr = self.df.data.as_mut_ptr();
             let next_data: Option<Self::Item>;
@@ -579,10 +600,26 @@ impl std::ops::Mul<&CartesianDataFrame2D<Real>> for &CartesianDataFrame2D<Real> 
     }
 }
 
+/// The components to iterate over
+pub enum IterComp{
+    Comps(Vec<usize>),
+    All,
+}
+
+impl IterComp {
+    fn contains(&self, comp: usize) -> bool {
+        match self {
+            IterComp::Comps(cmps) => {cmps.contains(&comp)}
+            IterComp::All => { true }
+        }
+    }
+}
+
 pub struct CartesianDataFrameGhostIter<'a, S> {
     df: &'a CartesianDataFrame2D<S>,
     current_indx: usize,
     side: Vec<CellType>,
+    comps: IterComp,
 }
 
 /// mutable iterator over the east cells in `CartesianDataFrame`.
@@ -590,6 +627,7 @@ pub struct CartesianDataFrameGhostIterMut<'a,S> {
     df: &'a mut CartesianDataFrame2D<S>,
     current_indx: usize,
     side: Vec<CellType>,
+    comps: IterComp,
 }
 
 impl <'a, S> Iterator for CartesianDataFrameGhostIterMut<'a,S>
@@ -603,7 +641,9 @@ impl <'a, S> Iterator for CartesianDataFrameGhostIterMut<'a,S>
     fn next(&mut self) -> Option<Self::Item> {
         // progress the current index to next on the given side
         while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
-                                  !(self.side.contains(&self.df.cell_type[self.current_indx])) {
+            !(self.side.contains(&self.df.cell_type[self.current_indx])) ||
+            !(self.comps.contains(self.df.get_ij(self.current_indx).unwrap().2))
+        {
             self.current_indx += 1;
         }
 
@@ -633,7 +673,9 @@ impl <'a, S> Iterator for CartesianDataFrameGhostIter<'a, S>
     fn next(&mut self) -> Option<Self::Item> {
         // progress the current index to next on the given side
         while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
-                                  !(self.side.contains(&self.df.cell_type[self.current_indx])) {
+            !(self.side.contains(&self.df.cell_type[self.current_indx])) ||
+            !(self.comps.contains(self.df.get_ij(self.current_indx).unwrap().2))
+        {
             self.current_indx += 1;
         }
 
@@ -652,29 +694,31 @@ impl <'a, S> Iterator for CartesianDataFrameGhostIter<'a, S>
 }
 
 pub trait GhostIteratorMut <'a,S> {
-    fn ghost(self, side: Vec<CellType>) -> CartesianDataFrameGhostIterMut<'a,S>;
+    fn ghost(self, side: Vec<CellType>, comps: IterComp) -> CartesianDataFrameGhostIterMut<'a,S>;
 }
 
 pub trait GhostIterator <'a, S> {
-    fn ghost(self, side: Vec<CellType>) -> CartesianDataFrameGhostIter<'a, S>;
+    fn ghost(self, side: Vec<CellType>, comps: IterComp) -> CartesianDataFrameGhostIter<'a, S>;
 }
 
 impl <'a,S> GhostIteratorMut <'a,S> for CartesianDataFrame2DIterMut<'a,S> {
-    fn ghost(self, side: Vec<CellType>) -> CartesianDataFrameGhostIterMut<'a,S> {
+    fn ghost(self, side: Vec<CellType>, comps: IterComp) -> CartesianDataFrameGhostIterMut<'a,S> {
         CartesianDataFrameGhostIterMut{
             current_indx: 0,
             df: self.df,
             side,
+            comps,
         }   
     }
 }
 
 impl <'a, S> GhostIterator <'a, S> for CartesianDataFrame2DIter<'a, S> {
-    fn ghost(self, side: Vec<CellType>) -> CartesianDataFrameGhostIter<'a, S> {
+    fn ghost(self, side: Vec<CellType>, comps: IterComp) -> CartesianDataFrameGhostIter<'a, S> {
         CartesianDataFrameGhostIter{
             current_indx: 0,
             df: self.df,
             side,
+            comps,
         }
     }
 }
@@ -723,6 +767,13 @@ mod tests{
     use crate::boundary_conditions::*;
 
     #[test]
+    fn test_iter_comp(){
+        let cmps = IterComp::Comps(vec![1,2]);
+        assert!(cmps.contains(1) == true);
+        assert!(cmps.contains(5) == false);
+    }
+
+    #[test]
     fn data_frame_iterator() {
         
         // 2D
@@ -734,7 +785,7 @@ mod tests{
             df2.fill_ic(|x,y,_| x + y);
             
             let mut df2_iter = df2.into_iter();
-            assert_eq!(df2_iter.next(), Some(&2.0));
+            assert_eq!(df2_iter.next(), Some(& 2.0));
             assert_eq!(df2_iter.next(), Some(& 4.0));
             assert_eq!(df2_iter.next(), Some(& 6.0));
             assert_eq!(df2_iter.next(), Some(& 4.0));
@@ -755,31 +806,31 @@ mod tests{
         assert_eq!(
             df2.cell_type,
             vec![
-                CellType::SouthWest,
-                CellType::South,
-                CellType::South,
-                CellType::South,
-                CellType::SouthEast,
-                CellType::West,
-                CellType::Valid,
-                CellType::Valid,
-                CellType::Valid,
-                CellType::East,
-                CellType::West,
-                CellType::Valid,
-                CellType::Valid,
-                CellType::Valid,
-                CellType::East,
-                CellType::West,
-                CellType::Valid,
-                CellType::Valid,
-                CellType::Valid,
-                CellType::East,
-                CellType::NorthWest,
-                CellType::North,
-                CellType::North,
-                CellType::North,
-                CellType::NorthEast
+                CellType::Ghost(Loc::SouthWest),
+                CellType::Ghost(Loc::South),
+                CellType::Ghost(Loc::South),
+                CellType::Ghost(Loc::South),
+                CellType::Ghost(Loc::SouthEast),
+                CellType::Ghost(Loc::West),
+                CellType::Valid(Loc::Regular),
+                CellType::Valid(Loc::Regular),
+                CellType::Valid(Loc::Regular),
+                CellType::Ghost(Loc::East),
+                CellType::Ghost(Loc::West),
+                CellType::Valid(Loc::Regular),
+                CellType::Valid(Loc::Regular),
+                CellType::Valid(Loc::Regular),
+                CellType::Ghost(Loc::East),
+                CellType::Ghost(Loc::West),
+                CellType::Valid(Loc::Regular),
+                CellType::Valid(Loc::Regular),
+                CellType::Valid(Loc::Regular),
+                CellType::Ghost(Loc::East),
+                CellType::Ghost(Loc::NorthWest),
+                CellType::Ghost(Loc::North),
+                CellType::Ghost(Loc::North),
+                CellType::Ghost(Loc::North),
+                CellType::Ghost(Loc::NorthEast)
             ]
         );
 
@@ -911,7 +962,7 @@ mod tests{
         //     0.0,  0.0, 4.0, 2.0, 0.0, 0.0,  0.0,
         //     0.0,  0.0, 4.0, 2.0, 0.0, 0.0,  0.0
         //]
-        let mut east_iter = cdf.iter_mut().ghost(vec![CellType::East]);
+        let mut east_iter = cdf.iter_mut().ghost(vec![CellType::Ghost(Loc::East)], IterComp::All);
         assert_eq!(east_iter.next(), Some(&mut 8.0));
         assert_eq!(east_iter.next(), Some(&mut 10.0));
         assert_eq!(east_iter.next(), Some(&mut 8.0));
@@ -946,7 +997,7 @@ mod tests{
         //
 
 
-        let mut east_iter = cdf.iter().ghost(vec![CellType::East]);
+        let mut east_iter = cdf.iter().ghost(vec![CellType::Ghost(Loc::East)], IterComp::All);
         assert_eq!(east_iter.next(), Some(& 8.0));
         assert_eq!(east_iter.next(), Some(& 10.0));
         assert_eq!(east_iter.next(), Some(& 8.0));
@@ -955,7 +1006,7 @@ mod tests{
         assert_eq!(east_iter.next(), Some(& 10.0));
         assert_eq!(east_iter.next(), None);
 
-        let mut south_iter = cdf.iter().ghost(vec![CellType::South]);
+        let mut south_iter = cdf.iter().ghost(vec![CellType::Ghost(Loc::South)], IterComp::All);
         assert_eq!(south_iter.next(), Some(& 4.0));
         assert_eq!(south_iter.next(), Some(& 2.0));
         assert_eq!(south_iter.next(), Some(& 0.0));
@@ -965,31 +1016,4 @@ mod tests{
         assert_eq!(south_iter.next(), None);
     }
 
-    #[test]
-    fn test_ghost_collect_two_ghost() {
-        let u1 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3, 3]));
-
-        let bc = BCs::new(vec![
-            ComponentBCs::new(
-                //        x direction             y direction
-                vec![BcType::Dirichlet(0.0), BcType::Dirichlet(3.0)], // low
-                vec![BcType::Dirichlet(7.0), BcType::Dirichlet(4.0)], //high
-            )
-        ]);
-        let mut cdf = CartesianDataFrame2D::new_from(&u1, bc, 1, 2);
-        cdf.fill_ic(|x,_,_| x + 1.0);
-        cdf.fill_bc();
-
-        // collect eastern ghost cells
-        let east = cdf.collect_ghost_cells(vec![CellType::East]);
-        assert_eq!(east, vec![8.0, 10.0, 8.0, 10.0, 8.0, 10.0]);
-
-        // collect southern ghost cells
-        let south = cdf.collect_ghost_cells(vec![CellType::South]);
-        assert_eq!(south, vec![4.0, 2.0, 0.0, 4.0, 2.0, 0.0]);
-
-        // collect northern ghost cells
-        let north = cdf.collect_ghost_cells(vec![CellType::North]);
-        assert_eq!(north, vec![6.0, 4.0, 2.0, 6.0, 4.0, 2.0]);
-    }
 }

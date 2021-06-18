@@ -3,18 +3,10 @@
 /// nodes can be filled
 pub trait BoundaryCondition <S> {
     /// function which fills the boundary conditions
-    fn fill_bc(&mut self, bcs: &BCs<S>);
-
-    /// checks if the cell at (i,j,k) contains a valid or a ghost cell. Returns true if valid,
-    /// and returns false if ghost
-    fn ijk_is_valid_cell(&self, i: isize, j: isize, k: isize) -> bool;
-
-    /// check if the cell at p contains a valid or ghost cell. Returns same as ijk_is_valid_cell
-    fn p_is_valid_cell(&self, p: usize) -> bool;
+    fn fill_bc(&mut self);
 }
 
 /// Available boundary conditions
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub enum BcType <S> {
     /// Linearly extrapolates ghost cells from the data in the valid region,

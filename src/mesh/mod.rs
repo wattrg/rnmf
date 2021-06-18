@@ -1,14 +1,16 @@
 use core::ops::Index;
+use crate::Real;
 
 /// # Two dimensional cartesian mesh
 /// A mesh where each cell is the same size, and has edges perpendicular to the *x* and *y* axis.
 pub mod cartesian2d;
 
+/// Trait required by all cells to ensure the required background work can be done by `rnmf`
+pub trait Cell<'a>: IntoIterator + Index<usize, Output = &'a mut Real> + Clone + Copy + Default {}
+
 /// Allows for operations to be performed on any block, regardless of the type of 
 /// mesh contained within
-pub trait Block: Index<String>{
-
-}
+pub trait Block: Index<String>{}
 
 /// Allows for operations to be performed on any dataframe, regardless of the type of 
 /// mesh stored within
