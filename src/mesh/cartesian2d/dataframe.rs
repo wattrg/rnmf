@@ -6,6 +6,7 @@ use super::*;
 use super::mesh::*;
 use crate::boundary_conditions::{BCs, BcType, BoundaryCondition};
 use super::super::{DataFrame};
+use log::warn;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Loc {
@@ -73,6 +74,10 @@ impl <S> CartesianDataFrame2D<S>
                     n_ghost: usize) -> CartesianDataFrame2D<S>
     {
         //assert!(m.n[0] >= 2 * n_ghost && m.n[1] >= 2 * n_ghost);
+        if !(m.n[0] >= 2 * n_ghost) || !(m.n[1] >= 2 * n_ghost) {
+            warn!("Dataframe too thin. Make sure you have at least twice the number
+                     of ghost cells in each direction");
+        }
 
         let n_nodes = ((m.n[0] + 2*n_ghost) * (m.n[1] + 2*n_ghost))*n_comp;
 
@@ -1102,7 +1107,7 @@ mod tests{
                 CellType::Valid(Loc::SouthEast)
             ]
         );
-        assert_eq!(north, vec![2.0, 4.0, 6.0, 8.0, 10.0, 2.0, 4.0, 6.0, 8.0, 10.0]);
+        assert_eq!(south, vec![2.0, 4.0, 6.0, 8.0, 10.0, 2.0, 4.0, 6.0, 8.0, 10.0]);
 
         let east = cdf.collect_typed_cells(
             vec![
