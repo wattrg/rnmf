@@ -7,7 +7,7 @@ pub trait BoundaryCondition <S> {
 }
 
 /// Available boundary conditions
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum BcType <S> {
     /// Linearly extrapolates ghost cells from the data in the valid region,
     /// so that the value on the boundary is the value supplied by the user
@@ -19,9 +19,8 @@ pub enum BcType <S> {
     /// The ghost cells will become a reflection of the actual values
     Reflect,
 
-    /// boundary is internal to the overall domain, and should be filled with values from the block
-    /// with the given `id` 
-    Internal(usize),
+    /// The values in the ghost cells are prescribed by a vector of values
+    Prescribed(Vec<S>),
 }
 
 // /// specifies the boundary condition for each inner component of the data

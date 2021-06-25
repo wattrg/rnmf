@@ -19,9 +19,10 @@ cartesian = []
 multi_buffer = []
 
 [dependencies]
-rlua = "0.17.0"
+rlua = "0.17"
 #derive = {version="0.1.0", path = "./derive"}
-indicatif = "0.15.0"
+indicatif = "0.15"
 vtkio = "0.6"
 colored = "2.0"
 log = "0.4"
+rayon = "1.5"

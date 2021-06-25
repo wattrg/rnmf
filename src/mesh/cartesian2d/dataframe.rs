@@ -268,13 +268,19 @@ where
 
 impl<S> CartesianDataFrame2D<S>
 where
-    S: Clone + Default
+    S: Clone + Default + Copy + std::fmt::Debug
 {
     fn collect_typed_cells(&mut self, side: Vec<CellType>) -> Vec<S> {
         self.iter()
             .ghost(side, IterComp::All)
             .cloned()
             .collect()
+    }
+
+    fn fill_prescribed_bc(&mut self, values: &Vec<S>, side: Vec<CellType>, comp: IterComp) {
+        for (cell, value) in self.iter_mut().ghost(side, comp).zip(values.iter()){
+            *cell = *value;
+        }
     }
 }
 
@@ -369,8 +375,26 @@ impl BoundaryCondition<Real> for CartesianDataFrame2D<Real>{
                     BcType::Reflect => {
                         unimplemented!("Reflect boundary condition not supported yet")
                     }
-                    BcType::Internal(_id) => {
-                        unimplemented!("Internal boundary condition not supported yet");
+                    BcType::Prescribed(values) => {
+                        // figure out the side we are working on
+                        let mut sides: Vec<CellType> = Vec::new();
+                        if i_dim == 0{
+                            sides = vec![
+                                CellType::Ghost(Loc::West),
+                                CellType::Ghost(Loc::NorthWest),
+                                CellType::Ghost(Loc::SouthWest)
+                            ];
+                        }
+                        else if i_dim == 1 {
+                            sides = vec![
+                                CellType::Ghost(Loc::South),
+                                CellType::Ghost(Loc::SouthWest),
+                                CellType::Ghost(Loc::SouthEast)
+                            ];
+                        }
+
+                        // fill the boundary condition
+                        self.fill_prescribed_bc(values, sides, IterComp::Comps(vec![i_comp]));
                     }
                 }
 
@@ -386,8 +410,22 @@ impl BoundaryCondition<Real> for CartesianDataFrame2D<Real>{
                     BcType::Reflect => {
                         unimplemented!("Reflect boundary condition not supported yet")
                     }
-                    BcType::Internal(_id) => {
-                        unimplemented!("Internal boundary condition not supported yet")
+                    BcType::Prescribed(values) => {
+                        let mut sides: Vec<CellType> = Vec::new();
+                        if i_dim == 0 {
+                            sides = vec![
+                                CellType::Ghost(Loc::East),
+                                CellType::Ghost(Loc::NorthEast),
+                                CellType::Ghost(Loc::SouthEast)];
+                        }
+                        else if i_dim == 1 {
+                            sides = vec![
+                                CellType::Ghost(Loc::North),
+                                CellType::Ghost(Loc::NorthEast),
+                                CellType::Ghost(Loc::NorthWest)
+                            ];
+                        }
+                        self.fill_prescribed_bc(values, sides, IterComp::Comps(vec![i_comp]));
                     }
                 }
             }
@@ -456,8 +494,6 @@ impl <'a, S> Iterator for CartesianDataFrame2DIterMut<'a, S> {
     fn next(&mut self) -> Option<Self::Item> {
         // progress the current index to skip ghost cells
         while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
-                                  // !self.df.p_is_valid_cell(self.current_indx) {
-            // !(self.df.cell_type[self.current_indx] == CellType::Valid(_))
             !(match self.df.cell_type[self.current_indx]{CellType::Valid(_) => {true} _ => {false}})
         {
             self.current_indx += 1;
@@ -465,8 +501,6 @@ impl <'a, S> Iterator for CartesianDataFrame2DIterMut<'a, S> {
 
         // check if the next item exists
         if self.current_indx <= self.df.n_nodes-self.df.n_comp &&
-                   //&& self.df.p_is_valid_cell(self.current_indx){
-            //&& self.df.cell_type[self.current_indx] == CellType::Valid(_)
             (match self.df.cell_type[self.current_indx]{CellType::Valid(_) => {true} _ => {false}})
         {
             // access and return next item 
@@ -657,6 +691,7 @@ impl std::ops::Mul<&CartesianDataFrame2D<Real>> for &CartesianDataFrame2D<Real> 
 }
 
 /// The components to iterate over
+#[derive(Debug, Clone)]
 pub enum IterComp{
     Comps(Vec<usize>),
     All,
@@ -696,15 +731,17 @@ impl <'a, S> Iterator for CartesianDataFrameGhostIterMut<'a,S>
     // ever want to do
     fn next(&mut self) -> Option<Self::Item> {
         // progress the current index to next on the given side
-        while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
-            !(self.side.contains(&self.df.cell_type[self.current_indx])) ||
-            !(self.comps.contains(self.df.get_ij(self.current_indx).unwrap().2))
+        while self.current_indx < self.df.n_nodes &&
+            // check if we want the side of the current cell
+            (!(self.side.contains(&self.df.cell_type[self.current_indx])) ||
+            // check if the component number is correct
+            !(self.comps.contains(self.df.get_ij(self.current_indx).unwrap().2)))
         {
             self.current_indx += 1;
         }
 
         // check if the next item exists
-        if self.current_indx <= self.df.n_nodes-self.df.n_comp {
+        if self.current_indx < self.df.n_nodes {
             // access and return next item
             let ptr = self.df.data.as_mut_ptr();
             let next_data: Option<Self::Item>;
@@ -728,15 +765,15 @@ impl <'a, S> Iterator for CartesianDataFrameGhostIter<'a, S>
 
     fn next(&mut self) -> Option<Self::Item> {
         // progress the current index to next on the given side
-        while self.current_indx <= self.df.n_nodes - self.df.n_comp &&
-            !(self.side.contains(&self.df.cell_type[self.current_indx])) ||
-            !(self.comps.contains(self.df.get_ij(self.current_indx).unwrap().2))
+        while self.current_indx < self.df.n_nodes &&
+            (!(self.side.contains(&self.df.cell_type[self.current_indx])) ||
+            !(self.comps.contains(self.df.get_ij(self.current_indx).unwrap().2)))
         {
             self.current_indx += 1;
         }
 
         // check if the next item exists
-        if self.current_indx <= self.df.n_nodes-self.df.n_comp{
+        if self.current_indx < self.df.n_nodes{
             // access and return next item
             let next_data = Some(&self.df.data[self.current_indx]);
             self.current_indx += 1;
@@ -993,6 +1030,34 @@ mod tests{
                  0.0,  0.0, 6.0, 4.0, 2.0, 0.0,  0.0,
                  0.0,  0.0, 6.0, 4.0, 2.0, 0.0,  0.0
             ]
+        )
+    }
+
+    #[test]
+    fn test_prescribed_two_ghost() {
+        let u1 = CartesianMesh2D::new(RealVec2([0.0, 0.0]), RealVec2([6.0, 6.0]), UIntVec2([3,3]));
+        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0];
+        let bc = BCs::new(
+            vec![
+                ComponentBCs::new(
+                    vec![BcType::Prescribed(values.clone()), BcType::Prescribed(values.clone())],
+                    vec![BcType::Prescribed(values.clone()), BcType::Prescribed(values.clone())],
+                )
+            ]
+        );
+
+
+        let mut cdf = CartesianDataFrame2D::new_from(&u1, bc, 1, 2);
+        cdf.fill_bc();
+        assert_eq!(
+            cdf.data,
+            vec![1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,
+                 8.0,  9.0, 10.0, 11.0, 12.0, 13.0, 14.0,
+                 5.0,  6.0,  0.0,  0.0,  0.0,  5.0,  6.0,
+                 7.0,  8.0,  0.0,  0.0,  0.0,  7.0,  8.0,
+                 9.0, 10.0,  0.0,  0.0,  0.0,  9.0, 10.0,
+                 1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,
+                 8.0,  9.0, 10.0, 11.0, 12.0, 13.0, 14.0]
         )
     }
 

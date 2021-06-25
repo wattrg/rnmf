@@ -32,3 +32,9 @@ pub struct Domain<B: Block> {
     blocks: Vec<B>,
 }
 
+impl<B> Domain<B>
+where
+    B : Block
+{
+
+}
