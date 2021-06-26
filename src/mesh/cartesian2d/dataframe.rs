@@ -1091,6 +1091,13 @@ mod tests{
         assert_eq!(east_iter.next(), Some(&mut 8.0));
         assert_eq!(east_iter.next(), Some(&mut 10.0));
         assert_eq!(east_iter.next(), None);
+
+        let mut north_east_iter = cdf.iter_mut().ghost(vec![CellType::Ghost(Loc::NorthEast)], IterComp::All);
+        assert_eq!(north_east_iter.next(), Some(&mut 0.0));
+        assert_eq!(north_east_iter.next(), Some(&mut 0.0));
+        assert_eq!(north_east_iter.next(), Some(&mut 0.0));
+        assert_eq!(north_east_iter.next(), Some(&mut 0.0));
+        assert_eq!(north_east_iter.next(), None);
     }
 
     #[test]
